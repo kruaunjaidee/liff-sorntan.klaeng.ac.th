@@ -117,10 +117,49 @@
     .liff-badge-info  { background: rgba(59,130,246,0.15); color: #93c5fd; border-color: rgba(59,130,246,0.4); }
     .liff-badge-warn  { background: rgba(234,179,8,0.15);  color: #fde047; border-color: rgba(234,179,8,0.4); }
     .liff-badge-error { background: rgba(239,68,68,0.15);  color: #fca5a5; border-color: rgba(239,68,68,0.4); }
+
+    /* Redirect screen */
+    #redirectScreen {
+      display: none;
+      position: fixed; inset: 0;
+      background: linear-gradient(135deg, #0f172a, #1e293b);
+      z-index: 99999;
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 20px;
+      text-align: center; padding: 24px;
+    }
+    #redirectScreen.show { display: flex; }
+    .line-logo {
+      width: 72px; height: 72px; border-radius: 20px;
+      background: #06C755; display: flex; align-items: center; justify-content: center;
+      font-size: 2.5rem; box-shadow: 0 0 32px rgba(6,199,85,0.5);
+      animation: pulse-green 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse-green {
+      0%, 100% { box-shadow: 0 0 20px rgba(6,199,85,0.4); }
+      50%       { box-shadow: 0 0 40px rgba(6,199,85,0.8); }
+    }
   </style>
 </head>
 
 <body class="bg-gradient-to-br from-slate-900 via-gray-900 to-black text-white min-h-screen flex flex-col items-center justify-start p-4 sm:p-6 pb-24">
+
+  <!-- REDIRECT SCREEN (แสดงเมื่อไม่ได้อยู่ใน LINE app) -->
+  <div id="redirectScreen">
+    <div class="line-logo">💬</div>
+    <div>
+      <h2 class="text-2xl font-bold text-white mb-2">กำลังเปิด LINE...</h2>
+      <p class="text-slate-400 text-sm mb-1">กรุณารอสักครู่ ระบบกำลัง redirect ไปยัง LINE App</p>
+      <p class="text-slate-500 text-xs">หากไม่เปิดอัตโนมัติ กรุณากดปุ่มด้านล่าง</p>
+    </div>
+    <div class="spinner" style="border-top-color: #06C755; border-color: rgba(6,199,85,0.2);"></div>
+    <a id="redirectManualBtn" href="#"
+      class="mt-2 px-8 py-3 rounded-xl font-semibold text-white text-base flex items-center gap-2"
+      style="background: #06C755; box-shadow: 0 4px 20px rgba(6,199,85,0.4);">
+      <i class="bi bi-box-arrow-up-right"></i> เปิด LINE ด้วยตนเอง
+    </a>
+    <p class="text-slate-600 text-xs">ระบบนี้ต้องใช้งานผ่าน LINE App เท่านั้น</p>
+  </div>
 
   <!-- LOADING -->
   <div id="loadingOverlay">
@@ -137,7 +176,6 @@
     <h3 class="text-2xl sm:text-3xl font-bold glow-green tracking-wide">ระบบบันทึกการสอนแทน</h3>
     <p class="text-sm text-slate-400 mt-1">ครูขาด • ลา • ไปราชการ</p>
     <h5 class="text-base text-pink-400 glow-pink mt-1">ครูอั๋น ใจดี</h5>
-    <!-- LIFF Status Badge — อัพเดทอัตโนมัติหลัง liff.init() -->
     <div class="mt-2 flex justify-center">
       <span id="liffStatusBadge" class="liff-badge liff-badge-warn hidden">
         <i class="bi bi-arrow-repeat mr-1"></i>กำลังเชื่อมต่อ LINE...
@@ -292,11 +330,6 @@
           class="btn-gray flex-1 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2">
           <i class="bi bi-arrow-left-circle"></i> แก้ไข
         </button>
-        <!--
-          ⭐ submitBtn = user gesture จริง
-             กดแล้ว → shareTargetPicker เปิดทันที (synchronous)
-             → ผู้ใช้เลือกกลุ่ม → .then() → บันทึก Sheet
-        -->
         <button id="submitBtn"
           class="btn-success flex-1 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 text-base">
           <i class="bi bi-send-fill"></i> ยืนยันและส่ง
@@ -319,8 +352,47 @@
   const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw8FMpndZve9-cBaR76IBFDxHSFpZtNt_k5WyJ-mPtTO5GHaTf64dlz79kkwTufpDhP/exec";
   const LIFF_ID    = "2000563749-Yh67UIqr";
 
-  // default image ใช้เมื่อไม่มีรูปหรือรูปยังไม่ได้ upload ขึ้น Drive
+  // URL สำหรับเปิด LIFF โดยตรงจาก LINE App
+  // รูปแบบ: https://liff.line.me/{LIFF_ID}
+  const LIFF_URL   = `https://liff.line.me/${LIFF_ID}`;
+
+  // default image
   const DEFAULT_IMG = "https://lh3.googleusercontent.com/d/1hTcB5YnvnJtMg0l4fIO5Jo20QbKF5_wh";
+
+  // ============================================================
+  // ตรวจสอบ Environment ก่อนทำอะไรทั้งนั้น
+  // ถ้าไม่ได้อยู่ใน LINE in-app browser → redirect ไป LIFF URL ทันที
+  // ============================================================
+  (function checkAndRedirect() {
+    const ua = navigator.userAgent || "";
+
+    // ตรวจว่าอยู่ใน LINE in-app browser หรือไม่
+    // LINE in-app browser จะมี "Line/" ใน User-Agent
+    const isLineInApp = /Line\//i.test(ua);
+
+    if (!isLineInApp) {
+      // ไม่ได้อยู่ใน LINE App → แสดง redirect screen และ redirect
+      const screen = document.getElementById("redirectScreen");
+      screen.classList.add("show");
+
+      // อัพเดทลิงก์ปุ่ม manual
+      document.getElementById("redirectManualBtn").href = LIFF_URL;
+
+      // redirect อัตโนมัติทันที
+      window.location.replace(LIFF_URL);
+
+      // ถ้า replace ไม่ทำงาน (บาง browser บล็อก) ใช้ href แทน
+      setTimeout(() => {
+        window.location.href = LIFF_URL;
+      }, 500);
+
+      // หยุดการทำงานต่อ ไม่ต้อง init LIFF หรือ render form
+      return;
+    }
+
+    // ── อยู่ใน LINE in-app browser แล้ว → init LIFF ปกติ ──
+    initLiff();
+  })();
 
   // ============================================================
   // STATE
@@ -436,25 +508,8 @@
   document.getElementById("backBtn").addEventListener("click", () => showPage("page-form"));
 
   // ============================================================
-  // SUBMIT BUTTON
-  //
-  // แยก 2 ชุดการทำงานอย่างชัดเจน:
-  //
-  // ══════════════════════════════════════════════════════════════
-  // ชุดที่ 1 — มือถือ (LINE in-app browser)
-  //   liff.isInClient() = true
-  //   ▶ เรียก shareTargetPicker() ทันทีจาก click (synchronous)
-  //   ▶ LINE SDK รับรองว่าอยู่ใน gesture stack → ไม่มี error
-  //   ▶ ผู้ใช้เลือกกลุ่มใน LINE → .then() → บันทึก Sheet
-  //
-  // ══════════════════════════════════════════════════════════════
-  // ชุดที่ 2 — Web Browser (คอม / มือถือเปิดผ่าน browser)
-  //   liff.isInClient() = false
-  //   ▶ บันทึก Sheet ก่อน (ajax)
-  //   ▶ หลังบันทึกสำเร็จ → เรียก shareTargetPicker() ผ่าน LIFF
-  //     external login (withLoginOnExternalBrowser: true)
-  //   ▶ LINE จะเปิดหน้าต่างเลือก chat บน browser
-  // ══════════════════════════════════════════════════════════════
+  // SUBMIT BUTTON (ใช้งานได้เฉพาะใน LINE in-app เท่านั้น)
+  // ============================================================
   document.getElementById("submitBtn").addEventListener("click", function () {
     if (isSubmitting) return;
 
@@ -481,104 +536,35 @@
 
     const flexMsg = buildFlexMessage(formData, DEFAULT_IMG);
 
-    if (liff.isInClient()) {
-      // ══════════════════════════════════════════════════════════
-      // ชุดที่ 1: มือถือ — LINE in-app browser
-      // shareTargetPicker เรียก synchronous จาก click ทันที
-      // ══════════════════════════════════════════════════════════
-      btn.disabled = true;
-      btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังเปิดแชร์ LINE...`;
+    // อยู่ใน LINE in-app browser แน่นอน (ผ่าน checkAndRedirect แล้ว)
+    btn.disabled = true;
+    btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังเปิดแชร์ LINE...`;
 
-      liff.shareTargetPicker([flexMsg], { isMultiple: true })
-        .then((res) => {
-          // เลือกกลุ่มแล้วหรือกด X → บันทึก Sheet เสมอ
-          doSaveToSheet(formData, btn,
-            res ? "✅ แชร์และบันทึกสำเร็จ!" : "✅ บันทึกสำเร็จ! (ไม่ได้แชร์)");
-        })
-        .catch((err) => {
-          console.error("[Mobile] shareTargetPicker error:", err);
-          btn.disabled = false;
-          btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
-          Swal.fire({
-            icon: "warning",
-            title: "แชร์ไม่สำเร็จ (มือถือ)",
-            html: `<p>ต้องการบันทึกข้อมูลโดยไม่แชร์ไหม?<br>
-                   <small style="color:#94a3b8">${err?.message || err}</small></p>`,
-            confirmButtonText: "บันทึกอย่างเดียว",
-            confirmButtonColor: "#3b82f6",
-            showCancelButton: true,
-            cancelButtonText: "ยกเลิก",
-            background: "#1e293b", color: "#fff",
-          }).then(r => { if (r.isConfirmed) doSaveToSheet(formData, btn, "✅ บันทึกสำเร็จ!"); });
-        });
-
-    } else {
-      // ══════════════════════════════════════════════════════════
-      // ชุดที่ 2: Web Browser — บันทึก Sheet ก่อน → แล้วค่อย share
-      // (browser ไม่ต้องการ synchronous gesture สำหรับ LIFF external)
-      // ══════════════════════════════════════════════════════════
-      btn.disabled = true;
-      btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังบันทึก...`;
-      showLoading("กำลังบันทึกข้อมูล...");
-      isSubmitting = true;
-
-      $.ajax({
-        method: "POST", url: SCRIPT_URL, data: formData, dataType: "json",
-        success: (res) => {
-          hideLoading();
-          isSubmitting = false;
-
-          if (res.status === "success") {
-            btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังเปิดแชร์ LINE...`;
-
-            // บันทึกแล้ว → เปิด shareTargetPicker บน browser
-            liff.shareTargetPicker([flexMsg], { isMultiple: true })
-              .then((shareRes) => {
-                btn.disabled = false;
-                btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
-                showToast(shareRes ? "✅ แชร์และบันทึกสำเร็จ!" : "✅ บันทึกสำเร็จ! (ไม่ได้แชร์)");
-                resetForm();
-                showPage("page-form");
-              })
-              .catch((err) => {
-                console.error("[Browser] shareTargetPicker error:", err);
-                btn.disabled = false;
-                btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
-                // บันทึกสำเร็จแล้ว แค่ share ไม่ได้
-                Swal.fire({
-                  icon: "info",
-                  title: "บันทึกสำเร็จแล้ว",
-                  html: `<p>แต่ไม่สามารถเปิดแชร์ได้<br>
-                         <small style="color:#94a3b8">${err?.message || err}</small></p>`,
-                  confirmButtonText: "ตกลง",
-                  confirmButtonColor: "#22c55e",
-                  background: "#1e293b", color: "#fff",
-                }).then(() => { resetForm(); showPage("page-form"); });
-              });
-
-          } else {
-            btn.disabled = false;
-            btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
-            Swal.fire({ icon: "error", title: "บันทึกไม่สำเร็จ",
-              text: res.message || "กรุณาลองใหม่",
-              background: "#1e293b", color: "#fff" });
-          }
-        },
-        error: () => {
-          hideLoading();
-          isSubmitting = false;
-          btn.disabled = false;
-          btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
-          Swal.fire({ icon: "error", title: "บันทึกไม่สำเร็จ",
-            text: "ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่",
-            background: "#1e293b", color: "#fff" });
-        }
+    liff.shareTargetPicker([flexMsg], { isMultiple: true })
+      .then((res) => {
+        doSaveToSheet(formData, btn,
+          res ? "✅ แชร์และบันทึกสำเร็จ!" : "✅ บันทึกสำเร็จ! (ไม่ได้แชร์)");
+      })
+      .catch((err) => {
+        console.error("[Mobile] shareTargetPicker error:", err);
+        btn.disabled = false;
+        btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+        Swal.fire({
+          icon: "warning",
+          title: "แชร์ไม่สำเร็จ",
+          html: `<p>ต้องการบันทึกข้อมูลโดยไม่แชร์ไหม?<br>
+                 <small style="color:#94a3b8">${err?.message || err}</small></p>`,
+          confirmButtonText: "บันทึกอย่างเดียว",
+          confirmButtonColor: "#3b82f6",
+          showCancelButton: true,
+          cancelButtonText: "ยกเลิก",
+          background: "#1e293b", color: "#fff",
+        }).then(r => { if (r.isConfirmed) doSaveToSheet(formData, btn, "✅ บันทึกสำเร็จ!"); });
       });
-    }
   });
 
   // ============================================================
-  // doSaveToSheet — บันทึกข้อมูลลง Google Sheet
+  // doSaveToSheet
   // ============================================================
   function doSaveToSheet(formData, btn, successMsg) {
     btn.disabled = true;
@@ -591,7 +577,7 @@
       success: (res) => {
         hideLoading(); isSubmitting = false;
         btn.disabled = false;
-        btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
+        btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
         if (res.status === "success") {
           showToast(successMsg || "✅ บันทึกสำเร็จ!");
           resetForm(); showPage("page-form");
@@ -604,7 +590,7 @@
       error: () => {
         hideLoading(); isSubmitting = false;
         btn.disabled = false;
-        btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
+        btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
         Swal.fire({ icon:"error", title:"บันทึกไม่สำเร็จ",
           text:"ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่",
           background:"#1e293b", color:"#fff" });
@@ -674,40 +660,20 @@
   }
 
   // ============================================================
-  // updateEnvBadge — แสดง badge + hint ให้ตรงกับ 2 ชุดการทำงาน
+  // updateEnvBadge
   // ============================================================
-  function updateEnvBadge(inClient, errMsg) {
+  function updateEnvBadge() {
     const badge     = document.getElementById("liffStatusBadge");
     const hint      = document.getElementById("confirmHint");
-    const submitBtn = document.getElementById("submitBtn");
     if (!badge) return;
 
-    if (errMsg) {
-      badge.className = "liff-badge liff-badge-warn";
-      badge.innerHTML = `<i class="bi bi-exclamation-triangle-fill mr-1"></i>LIFF Error`;
-    } else if (inClient) {
-      // ชุดที่ 1: มือถือ LINE in-app
-      badge.className = "liff-badge liff-badge-ok";
-      badge.innerHTML = `<i class="bi bi-phone-fill mr-1"></i>มือถือ (LINE App) — แชร์ก่อน → บันทึก`;
-    } else {
-      // ชุดที่ 2: Web Browser
-      badge.className = "liff-badge liff-badge-info";
-      badge.innerHTML = `<i class="bi bi-display mr-1"></i>Web Browser — บันทึกก่อน → แชร์`;
-    }
+    badge.className = "liff-badge liff-badge-ok";
+    badge.innerHTML = `<i class="bi bi-phone-fill mr-1"></i>LINE App — พร้อมใช้งาน`;
     badge.classList.remove("hidden");
 
-    if (submitBtn && !submitBtn.disabled) {
-      submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
-    }
-
     if (hint) {
-      if (inClient && !errMsg) {
-        hint.innerHTML = `<i class="bi bi-phone-fill mr-1 text-green-400"></i>
-          <strong class="text-green-400">มือถือ:</strong> กดยืนยัน → เปิดแชร์ LINE ทันที → บันทึก`;
-      } else {
-        hint.innerHTML = `<i class="bi bi-display mr-1 text-blue-400"></i>
-          <strong class="text-blue-400">Browser:</strong> กดยืนยัน → บันทึก → เปิดแชร์ LINE`;
-      }
+      hint.innerHTML = `<i class="bi bi-phone-fill mr-1 text-green-400"></i>
+        <strong class="text-green-400">กดยืนยัน</strong> → เปิดแชร์ LINE ทันที → บันทึกข้อมูล`;
     }
   }
 
@@ -724,26 +690,35 @@
   }
 
   // ============================================================
-  // LIFF INIT
+  // LIFF INIT — เรียกเฉพาะเมื่อผ่านการเช็ก User-Agent แล้ว
   // ============================================================
+  function initLiff() {
+    document.getElementById("year").textContent = new Date().getFullYear();
+
+    liff.init({ liffId: LIFF_ID })
+      .then(() => {
+        const loggedIn = liff.isLoggedIn();
+        console.log("LIFF ready | loggedIn:", loggedIn);
+
+        if (!loggedIn) {
+          liff.login({ redirectUri: window.location.href });
+          return;
+        }
+        updateEnvBadge();
+      })
+      .catch(err => {
+        console.warn("LIFF init error:", err);
+        const badge = document.getElementById("liffStatusBadge");
+        if (badge) {
+          badge.className = "liff-badge liff-badge-error";
+          badge.innerHTML = `<i class="bi bi-exclamation-triangle-fill mr-1"></i>LIFF Error: ${err.message}`;
+          badge.classList.remove("hidden");
+        }
+      });
+  }
+
+  // set year (fallback หาก initLiff ไม่ถูกเรียก)
   document.getElementById("year").textContent = new Date().getFullYear();
-
-  liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true })
-    .then(() => {
-      const inClient = liff.isInClient();
-      const loggedIn = liff.isLoggedIn();
-      console.log("LIFF ready | inClient:", inClient, "| loggedIn:", loggedIn);
-
-      if (!loggedIn) {
-        liff.login({ redirectUri: window.location.href });
-        return;
-      }
-      updateEnvBadge(inClient);
-    })
-    .catch(err => {
-      console.warn("LIFF init error:", err);
-      updateEnvBadge(false, err.message);
-    });
   </script>
 </body>
 </html>
