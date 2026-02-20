@@ -290,7 +290,7 @@
         </div>
 
         <p class="text-sm text-slate-400 text-center mb-5">
-          <i class="bi bi-info-circle mr-1"></i>เมื่อยืนยัน ระบบจะบันทึกและแชร์เข้า <strong class="text-green-400">กลุ่มครูภาษาไทย</strong>
+          <i class="bi bi-info-circle mr-1"></i>เมื่อยืนยัน ระบบจะบันทึกและเปิดให้ <strong class="text-green-400">เลือกแชร์ไปยังบุคคลหรือกลุ่มที่ต้องการ</strong>
         </p>
 
         <div class="flex gap-3">
@@ -316,7 +316,7 @@
       // ==============================
       // CONFIG
       // ==============================
-      const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw8FMpndZve9-cBaR76IBFDxHSFpZtNt_k5WyJ-mPtTO5GHaTf64dlz79kkwTufpDhP/exec";
+       const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw8FMpndZve9-cBaR76IBFDxHSFpZtNt_k5WyJ-mPtTO5GHaTf64dlz79kkwTufpDhP/exec";
       const LIFF_ID = "2000563749-Yh67UIqr";
 
       // ==============================
@@ -444,31 +444,88 @@
       // ==============================
       // SUBMIT
       // ==============================
+      // ⚠️ KEY FIX: shareTargetPicker MUST be called synchronously from a
+      //    user-gesture (button click). Calling it inside Ajax .then() causes
+      //    LINE SDK to throw "not triggered by user action" error.
+      //    Solution: call shareTargetPicker FIRST (from click handler),
+      //    then save to Sheet inside its .then() callback.
+      // ==============================
+
       document.getElementById("submitBtn").addEventListener("click", submitData);
 
       function submitData() {
+        // Collect form data immediately (synchronous, in click handler)
         const data = {
           opt: "savedata",
-          nameTeacher: document.getElementById("nameTeacher").value,
+          nameTeacher:     document.getElementById("nameTeacher").value,
           nameTeacherSave: document.getElementById("nameTeacherSave").value,
-          numberAtPeriod: document.getElementById("numberAtPeriod").value,
-          subjectSave: document.getElementById("subjectSave").value,
-          subjectRoom: document.getElementById("subjectRoom").value,
-          thaiDate: getThaiDate(),
-          thaiTime: getThaiTime(),
-          imageBase64: uploadedImageBase64 || "",
+          numberAtPeriod:  document.getElementById("numberAtPeriod").value,
+          subjectSave:     document.getElementById("subjectSave").value,
+          subjectRoom:     document.getElementById("subjectRoom").value,
+          thaiDate:        getThaiDate(),
+          thaiTime:        getThaiTime(),
+          imageBase64:     uploadedImageBase64 || "",
         };
 
-        // Try to get LIFF user info
         try {
           const token = liff.getDecodedIDToken();
-          data.uid = token?.sub || "";
-          data.uname = token?.name || "";
-          data.uimg = token?.picture || "";
+          data.uid   = token?.sub     || "";
+          data.uname = token?.name    || "";
+          data.uimg  = token?.picture || "";
         } catch(e) {}
 
-        showLoading("กำลังบันทึกข้อมูล...");
+        // Use uploaded image preview OR fallback banner
+        const imgUrl = uploadedImageBase64
+          ? document.getElementById("imgPreview").src
+          : "https://lh3.googleusercontent.com/d/1hTcB5YnvnJtMg0l4fIO5Jo20QbKF5_wh";
 
+        // Build Flex Message (synchronous)
+        const flexMsg = buildFlexMessage(data, imgUrl);
+
+        // ✅ STEP 1: Open shareTargetPicker IMMEDIATELY (still in click-event stack)
+        //    This is the only way LINE SDK allows it to open.
+        liff.shareTargetPicker([flexMsg], { isMultiple: true })
+          .then((res) => {
+            // res.targetType == "chat" | "group" | "room" | undefined (user cancelled)
+            if (res && res.targetType) {
+              // ✅ STEP 2: User picked a target → now save to Sheet in background
+              saveToSheet(data);
+            } else {
+              // User closed picker without selecting — still offer to save
+              Swal.fire({
+                icon: "question",
+                title: "ยังไม่ได้เลือกปลายทาง",
+                html: `<p class="text-sm">ต้องการ <strong>บันทึกข้อมูลในระบบ</strong> โดยไม่แชร์หรือไม่?</p>`,
+                showCancelButton: true,
+                confirmButtonText: "บันทึกเลย",
+                cancelButtonText: "ยกเลิก",
+                confirmButtonColor: "#22c55e",
+                background: "#1e293b",
+                color: "#fff",
+              }).then(r => { if (r.isConfirmed) saveToSheet(data); });
+            }
+          })
+          .catch(err => {
+            console.error("shareTargetPicker error:", err);
+            // Picker failed (e.g. external browser, not in LINE app)
+            // Fallback: save to sheet and inform user
+            Swal.fire({
+              icon: "warning",
+              title: "ไม่สามารถเปิด LINE Picker ได้",
+              html: `<p class="text-sm">กรุณาเปิดลิงก์นี้ <strong>ภายในแอป LINE</strong><br>ระบบจะบันทึกข้อมูลให้อัตโนมัติ</p>`,
+              confirmButtonText: "บันทึกข้อมูล",
+              confirmButtonColor: "#3b82f6",
+              background: "#1e293b",
+              color: "#fff",
+            }).then(() => saveToSheet(data));
+          });
+      }
+
+      // ==============================
+      // SAVE TO SHEET (background)
+      // ==============================
+      function saveToSheet(data) {
+        showLoading("กำลังบันทึกข้อมูล...");
         $.ajax({
           method: "POST",
           url: SCRIPT_URL,
@@ -477,45 +534,49 @@
           success: (res) => {
             hideLoading();
             if (res.status === "success") {
-              window._formData = data;
-              window._imgUrl = res.imageUrl || "";
+              resetForm();
               Swal.fire({
                 icon: "success",
                 title: "✅ บันทึกสำเร็จ!",
-                html: `<p class="text-sm">กำลังเปิดแชร์ไปยัง <strong>กลุ่มครูภาษาไทย</strong>...</p>`,
+                html: `<p class="text-sm">ข้อมูลถูกบันทึกในระบบเรียบร้อยแล้ว</p>`,
                 timer: 2000,
                 showConfirmButton: false,
                 background: "#1e293b",
                 color: "#fff",
-              }).then(() => shareToLine());
+              }).then(() => showPage("page-form"));
             } else {
-              Swal.fire({ icon: "error", title: "เกิดข้อผิดพลาด", text: res.message || "กรุณาลองใหม่", background: "#1e293b", color: "#fff" });
+              Swal.fire({
+                icon: "error", title: "บันทึกไม่สำเร็จ",
+                text: res.message || "กรุณาลองใหม่",
+                background: "#1e293b", color: "#fff",
+              });
             }
           },
-          error: (err) => {
+          error: () => {
             hideLoading();
-            Swal.fire({ icon: "error", title: "ไม่สามารถเชื่อมต่อได้", text: "กรุณาตรวจสอบการเชื่อมต่อ", background: "#1e293b", color: "#fff" });
+            Swal.fire({
+              icon: "error", title: "ไม่สามารถเชื่อมต่อได้",
+              text: "กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต",
+              background: "#1e293b", color: "#fff",
+            });
           }
         });
       }
 
       // ==============================
-      // SHARE TO LINE
+      // BUILD FLEX MESSAGE
       // ==============================
-      function shareToLine() {
-        if (!window._formData) return;
-        const d = window._formData;
-        const imgUrl = window._imgUrl || "https://lh3.googleusercontent.com/d/1hTcB5YnvnJtMg0l4fIO5Jo20QbKF5_wh";
-
-        const flexMsg = {
+      function buildFlexMessage(d, imgUrl) {
+        return {
           type: "flex",
-          altText: `แจ้งสอนแทน: ${d.nameTeacher} → ${d.nameTeacherSave} คาบ ${d.numberAtPeriod}`,
+          altText: `📚 แจ้งสอนแทน | ${d.nameTeacher} → ${d.nameTeacherSave} | คาบ ${d.numberAtPeriod} | ห้อง ${d.subjectRoom}`,
           contents: {
             type: "bubble",
             size: "mega",
             header: {
               type: "box",
               layout: "vertical",
+              paddingAll: "0px",
               contents: [
                 {
                   type: "image",
@@ -523,116 +584,85 @@
                   size: "full",
                   aspectRatio: "20:9",
                   aspectMode: "cover",
-                  action: { type: "uri", uri: "https://line.me" }
                 },
                 {
                   type: "box",
                   layout: "vertical",
-                  contents: [
-                    {
-                      type: "box",
-                      layout: "vertical",
-                      contents: [
-                        {
-                          type: "text",
-                          text: "📚 แจ้งการสอนแทน",
-                          color: "#ffffff",
-                          size: "xl",
-                          weight: "bold",
-                          align: "center",
-                          wrap: true
-                        },
-                        {
-                          type: "text",
-                          text: "ครูขาด • ลา • ไปราชการ",
-                          color: "#ffffffcc",
-                          size: "sm",
-                          align: "center",
-                          margin: "xs"
-                        }
-                      ]
-                    }
-                  ],
                   position: "absolute",
                   offsetBottom: "0px",
                   offsetStart: "0px",
                   offsetEnd: "0px",
-                  backgroundColor: "#00000066",
+                  backgroundColor: "#00000077",
                   paddingAll: "16px",
-                  paddingTop: "18px"
+                  contents: [
+                    {
+                      type: "text",
+                      text: "📚 แจ้งการสอนแทน",
+                      color: "#ffffff",
+                      size: "xl",
+                      weight: "bold",
+                      align: "center",
+                    },
+                    {
+                      type: "text",
+                      text: "ครูขาด • ลา • ไปราชการ",
+                      color: "#ffffffbb",
+                      size: "sm",
+                      align: "center",
+                      margin: "xs",
+                    }
+                  ]
                 }
-              ],
-              paddingAll: "0px"
+              ]
             },
             body: {
               type: "box",
               layout: "vertical",
-              contents: [
-                buildRow("👩‍🏫 ผู้ลาสอน", d.nameTeacher),
-                buildRow("👨‍🏫 ผู้สอนแทน", d.nameTeacherSave),
-                buildRow("⏰ คาบที่สอนแทน", `คาบ ${d.numberAtPeriod}`),
-                buildRow("📖 วิชา", d.subjectSave),
-                buildRow("🏫 ห้องเรียน", d.subjectRoom),
-                { type: "separator", margin: "md" },
-                buildRow("📅 วันที่", d.thaiDate),
-                buildRow("🕐 เวลา", d.thaiTime),
-              ],
-              paddingAll: "16px",
               backgroundColor: "#0f172a",
-              spacing: "sm"
+              paddingAll: "18px",
+              spacing: "sm",
+              contents: [
+                buildRow("👩‍🏫 ผู้ลาสอน",      d.nameTeacher),
+                buildRow("👨‍🏫 ผู้สอนแทน",     d.nameTeacherSave),
+                buildRow("⏰ คาบที่สอนแทน",  `คาบ ${d.numberAtPeriod}`),
+                buildRow("📖 วิชา",           d.subjectSave),
+                buildRow("🏫 ห้องเรียน",      d.subjectRoom),
+                { type: "separator", margin: "md", color: "#334155" },
+                buildRow("📅 วันที่",          d.thaiDate),
+                buildRow("🕐 เวลา",           d.thaiTime),
+              ]
             },
             footer: {
               type: "box",
               layout: "vertical",
-              contents: [
-                {
-                  type: "text",
-                  text: "❤️ ระบบบันทึกการสอนแทน | ครูอั๋น ใจดี",
-                  color: "#ffffff",
-                  size: "xs",
-                  align: "center",
-                  wrap: true
-                }
-              ],
               backgroundColor: "#ec4899",
-              paddingAll: "12px"
-            },
-            styles: {
-              header: { backgroundColor: "#0f172a" },
-              body: { backgroundColor: "#0f172a" },
-              footer: { backgroundColor: "#ec4899" }
+              paddingAll: "12px",
+              contents: [{
+                type: "text",
+                text: "❤️ ระบบบันทึกการสอนแทน | ครูอั๋น ใจดี",
+                color: "#ffffff",
+                size: "xs",
+                align: "center",
+                wrap: true,
+              }]
             }
           }
         };
+      }
 
-        liff.shareTargetPicker([flexMsg], { isMultiple: false })
-          .then(() => {
-            Swal.fire({
-              icon: "success",
-              title: "แชร์สำเร็จ! 🎉",
-              html: `<p class="text-sm">ส่งข้อมูลเข้า <strong>กลุ่มครูภาษาไทย</strong> เรียบร้อยแล้ว</p>`,
-              background: "#1e293b",
-              color: "#fff",
-              confirmButtonText: "ตกลง",
-              confirmButtonColor: "#22c55e"
-            }).then(() => {
-              // Reset form
-              showPage("page-form");
-              document.getElementById("nameTeacher").value = "";
-              document.getElementById("nameTeacherSave").value = "";
-              document.getElementById("numberAtPeriod").value = "";
-              document.getElementById("subjectSave").value = "";
-              document.getElementById("subjectRoom").value = "";
-              uploadedImageBase64 = null;
-              document.getElementById("imgPreviewWrapper").classList.add("hidden");
-              document.getElementById("uploadPlaceholder").classList.remove("hidden");
-              document.getElementById("fileInput").value = "";
-            });
-          })
-          .catch(err => {
-            console.error("Share error:", err);
-            Swal.fire({ icon: "warning", title: "แชร์ไม่สำเร็จ", text: "แต่บันทึกข้อมูลในระบบเรียบร้อยแล้ว", background: "#1e293b", color: "#fff" });
-          });
+      // ==============================
+      // RESET FORM
+      // ==============================
+      function resetForm() {
+        document.getElementById("nameTeacher").value     = "";
+        document.getElementById("nameTeacherSave").value = "";
+        document.getElementById("numberAtPeriod").value  = "";
+        document.getElementById("subjectSave").value     = "";
+        document.getElementById("subjectRoom").value     = "";
+        uploadedImageBase64 = null;
+        document.getElementById("fileInput").value       = "";
+        document.getElementById("imgPreviewWrapper").classList.add("hidden");
+        document.getElementById("uploadPlaceholder").classList.remove("hidden");
       }
 
       function buildRow(label, value) {
