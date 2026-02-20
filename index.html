@@ -436,31 +436,30 @@
   document.getElementById("backBtn").addEventListener("click", () => showPage("page-form"));
 
   // ============================================================
-  // SUBMIT BUTTON — user gesture จริง
+  // SUBMIT BUTTON
   //
-  // ⭐ กลยุทธ์ที่ถูกต้องที่สุด:
+  // แยก 2 ชุดการทำงานอย่างชัดเจน:
   //
-  //   [submitBtn click = user gesture]
-  //        │
-  //        ▼  (synchronous — ยังอยู่ใน gesture stack)
-  //   liff.shareTargetPicker()   ← เปิด LINE picker ทันที
-  //        │
-  //        ▼ .then()  (ผู้ใช้เลือกกลุ่มแล้ว หรือยกเลิก)
-  //   $.ajax POST → บันทึก Sheet
-  //        │
-  //        ▼ success
-  //   showToast / reset
+  // ══════════════════════════════════════════════════════════════
+  // ชุดที่ 1 — มือถือ (LINE in-app browser)
+  //   liff.isInClient() = true
+  //   ▶ เรียก shareTargetPicker() ทันทีจาก click (synchronous)
+  //   ▶ LINE SDK รับรองว่าอยู่ใน gesture stack → ไม่มี error
+  //   ▶ ผู้ใช้เลือกกลุ่มใน LINE → .then() → บันทึก Sheet
   //
-  //   ✅ ไม่มี popup กลาง
-  //   ✅ ไม่มี async ขั้นแรก (ajax ก่อน share)
-  //   ✅ LINE SDK ยอมรับ 100% เพราะ share เรียกจาก click โดยตรง
-  // ============================================================
+  // ══════════════════════════════════════════════════════════════
+  // ชุดที่ 2 — Web Browser (คอม / มือถือเปิดผ่าน browser)
+  //   liff.isInClient() = false
+  //   ▶ บันทึก Sheet ก่อน (ajax)
+  //   ▶ หลังบันทึกสำเร็จ → เรียก shareTargetPicker() ผ่าน LIFF
+  //     external login (withLoginOnExternalBrowser: true)
+  //   ▶ LINE จะเปิดหน้าต่างเลือก chat บน browser
+  // ══════════════════════════════════════════════════════════════
   document.getElementById("submitBtn").addEventListener("click", function () {
     if (isSubmitting) return;
 
     const btn = this;
 
-    // รวบรวมข้อมูล form
     const formData = {
       opt:             "savedata",
       nameTeacher:     document.getElementById("nameTeacher").value,
@@ -474,37 +473,108 @@
     };
 
     try {
-      const token       = liff.getDecodedIDToken();
-      formData.uid      = token?.sub     || "";
-      formData.uname    = token?.name    || "";
-      formData.uimg     = token?.picture || "";
+      const token = liff.getDecodedIDToken();
+      formData.uid   = token?.sub     || "";
+      formData.uname = token?.name    || "";
+      formData.uimg  = token?.picture || "";
     } catch(e) {}
 
-    btn.disabled = true;
-    btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังเปิดแชร์...`;
-
-    // ⭐ เรียก shareTargetPicker ทันที (synchronous จาก click)
-    //    ใช้ได้ทั้ง LINE in-app browser และ LINE Login บน mobile browser
-    //    LINE SDK ยอมรับเพราะยังอยู่ใน gesture stack
     const flexMsg = buildFlexMessage(formData, DEFAULT_IMG);
 
-    liff.shareTargetPicker([flexMsg], { isMultiple: true })
-      .then((shareRes) => {
-        // ผู้ใช้เลือกกลุ่มแล้ว หรือกด X → บันทึก Sheet ทุกกรณี
-        doSaveToSheet(formData, btn, shareRes ? "✅ แชร์และบันทึกสำเร็จ!" : "✅ บันทึกสำเร็จ!");
-      })
-      .catch((err) => {
-        console.error("shareTargetPicker error:", err);
-        btn.disabled = false;
-        btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
-        Swal.fire({
-          icon: "warning", title: "เปิดแชร์ไม่สำเร็จ",
-          html: `<p>ต้องการบันทึกข้อมูลลงระบบโดยไม่แชร์ไหม?<br><small style="color:#94a3b8">${err?.message || err}</small></p>`,
-          confirmButtonText: "บันทึกอย่างเดียว", confirmButtonColor: "#3b82f6",
-          showCancelButton: true, cancelButtonText: "ยกเลิก",
-          background:"#1e293b", color:"#fff",
-        }).then(r => { if (r.isConfirmed) doSaveToSheet(formData, btn, "✅ บันทึกสำเร็จ!"); });
+    if (liff.isInClient()) {
+      // ══════════════════════════════════════════════════════════
+      // ชุดที่ 1: มือถือ — LINE in-app browser
+      // shareTargetPicker เรียก synchronous จาก click ทันที
+      // ══════════════════════════════════════════════════════════
+      btn.disabled = true;
+      btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังเปิดแชร์ LINE...`;
+
+      liff.shareTargetPicker([flexMsg], { isMultiple: true })
+        .then((res) => {
+          // เลือกกลุ่มแล้วหรือกด X → บันทึก Sheet เสมอ
+          doSaveToSheet(formData, btn,
+            res ? "✅ แชร์และบันทึกสำเร็จ!" : "✅ บันทึกสำเร็จ! (ไม่ได้แชร์)");
+        })
+        .catch((err) => {
+          console.error("[Mobile] shareTargetPicker error:", err);
+          btn.disabled = false;
+          btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
+          Swal.fire({
+            icon: "warning",
+            title: "แชร์ไม่สำเร็จ (มือถือ)",
+            html: `<p>ต้องการบันทึกข้อมูลโดยไม่แชร์ไหม?<br>
+                   <small style="color:#94a3b8">${err?.message || err}</small></p>`,
+            confirmButtonText: "บันทึกอย่างเดียว",
+            confirmButtonColor: "#3b82f6",
+            showCancelButton: true,
+            cancelButtonText: "ยกเลิก",
+            background: "#1e293b", color: "#fff",
+          }).then(r => { if (r.isConfirmed) doSaveToSheet(formData, btn, "✅ บันทึกสำเร็จ!"); });
+        });
+
+    } else {
+      // ══════════════════════════════════════════════════════════
+      // ชุดที่ 2: Web Browser — บันทึก Sheet ก่อน → แล้วค่อย share
+      // (browser ไม่ต้องการ synchronous gesture สำหรับ LIFF external)
+      // ══════════════════════════════════════════════════════════
+      btn.disabled = true;
+      btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังบันทึก...`;
+      showLoading("กำลังบันทึกข้อมูล...");
+      isSubmitting = true;
+
+      $.ajax({
+        method: "POST", url: SCRIPT_URL, data: formData, dataType: "json",
+        success: (res) => {
+          hideLoading();
+          isSubmitting = false;
+
+          if (res.status === "success") {
+            btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังเปิดแชร์ LINE...`;
+
+            // บันทึกแล้ว → เปิด shareTargetPicker บน browser
+            liff.shareTargetPicker([flexMsg], { isMultiple: true })
+              .then((shareRes) => {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
+                showToast(shareRes ? "✅ แชร์และบันทึกสำเร็จ!" : "✅ บันทึกสำเร็จ! (ไม่ได้แชร์)");
+                resetForm();
+                showPage("page-form");
+              })
+              .catch((err) => {
+                console.error("[Browser] shareTargetPicker error:", err);
+                btn.disabled = false;
+                btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
+                // บันทึกสำเร็จแล้ว แค่ share ไม่ได้
+                Swal.fire({
+                  icon: "info",
+                  title: "บันทึกสำเร็จแล้ว",
+                  html: `<p>แต่ไม่สามารถเปิดแชร์ได้<br>
+                         <small style="color:#94a3b8">${err?.message || err}</small></p>`,
+                  confirmButtonText: "ตกลง",
+                  confirmButtonColor: "#22c55e",
+                  background: "#1e293b", color: "#fff",
+                }).then(() => { resetForm(); showPage("page-form"); });
+              });
+
+          } else {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
+            Swal.fire({ icon: "error", title: "บันทึกไม่สำเร็จ",
+              text: res.message || "กรุณาลองใหม่",
+              background: "#1e293b", color: "#fff" });
+          }
+        },
+        error: () => {
+          hideLoading();
+          isSubmitting = false;
+          btn.disabled = false;
+          btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
+          Swal.fire({ icon: "error", title: "บันทึกไม่สำเร็จ",
+            text: "ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่",
+            background: "#1e293b", color: "#fff" });
+        }
       });
+    }
   });
 
   // ============================================================
@@ -604,7 +674,7 @@
   }
 
   // ============================================================
-  // updateEnvBadge — แสดงสถานะ LIFF / LINE
+  // updateEnvBadge — แสดง badge + hint ให้ตรงกับ 2 ชุดการทำงาน
   // ============================================================
   function updateEnvBadge(inClient, errMsg) {
     const badge     = document.getElementById("liffStatusBadge");
@@ -616,20 +686,28 @@
       badge.className = "liff-badge liff-badge-warn";
       badge.innerHTML = `<i class="bi bi-exclamation-triangle-fill mr-1"></i>LIFF Error`;
     } else if (inClient) {
+      // ชุดที่ 1: มือถือ LINE in-app
       badge.className = "liff-badge liff-badge-ok";
-      badge.innerHTML = `<i class="bi bi-phone-fill mr-1"></i>LINE App ✓`;
+      badge.innerHTML = `<i class="bi bi-phone-fill mr-1"></i>มือถือ (LINE App) — แชร์ก่อน → บันทึก`;
     } else {
-      // เปิดบน mobile browser ด้วย LIFF login — shareTargetPicker อาจใช้ได้
+      // ชุดที่ 2: Web Browser
       badge.className = "liff-badge liff-badge-info";
-      badge.innerHTML = `<i class="bi bi-globe mr-1"></i>Mobile Browser ✓`;
+      badge.innerHTML = `<i class="bi bi-display mr-1"></i>Web Browser — บันทึกก่อน → แชร์`;
     }
     badge.classList.remove("hidden");
 
     if (submitBtn && !submitBtn.disabled) {
       submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
     }
+
     if (hint) {
-      hint.innerHTML = `<i class="bi bi-info-circle mr-1"></i>กดยืนยัน → <strong class="text-green-400">เปิดแชร์ LINE ทันที</strong> → บันทึก`;
+      if (inClient && !errMsg) {
+        hint.innerHTML = `<i class="bi bi-phone-fill mr-1 text-green-400"></i>
+          <strong class="text-green-400">มือถือ:</strong> กดยืนยัน → เปิดแชร์ LINE ทันที → บันทึก`;
+      } else {
+        hint.innerHTML = `<i class="bi bi-display mr-1 text-blue-400"></i>
+          <strong class="text-blue-400">Browser:</strong> กดยืนยัน → บันทึก → เปิดแชร์ LINE`;
+      }
     }
   }
 
