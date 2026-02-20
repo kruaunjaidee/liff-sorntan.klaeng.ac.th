@@ -482,7 +482,7 @@
             const d = new Date();
             const days = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
             const months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
-            return `วัน${days[d.getDay()]}ที่ ${d.getDate()} ${months[d.getMonth()]} ${(d.getFullYear() + 543 ).split("25")[1]}`;
+            return `วัน${days[d.getDay()]}ที่ ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear() + 543}`;
         }
         function getThaiTime() {
             const d = new Date();
