@@ -586,111 +586,116 @@
         // ==============================
         window._pendingFlex = null;
 
-        function submitData() {
-            const data = {
-                opt: "savedata",
-                nameTeacher: document.getElementById("nameTeacher").value,
-                nameTeacherSave: document.getElementById("nameTeacherSave").value,
-                numberAtPeriod: document.getElementById("numberAtPeriod").value,
-                subjectSave: document.getElementById("subjectSave").value,
-                subjectRoom: document.getElementById("subjectRoom").value,
-                thaiDate: getThaiDate(),
-                thaiTime: getThaiTime(),
-                imageBase64: uploadedImageBase64 || "",
-            };
+        <!-- ในส่วน <script> แก้ไขฟังก์ชัน submitData() เป็นแบบนี้ -->
 
-            try {
-                const token = liff.getDecodedIDToken();
-                data.uid = token?.sub || "";
-                data.uname = token?.name || "";
-                data.uimg = token?.picture || "";
-            } catch (e) { }
+function submitData() {
+    const data = {
+        opt: "savedata",
+        nameTeacher: document.getElementById("nameTeacher").value,
+        nameTeacherSave: document.getElementById("nameTeacherSave").value,
+        numberAtPeriod: document.getElementById("numberAtPeriod").value,
+        subjectSave: document.getElementById("subjectSave").value,
+        subjectRoom: document.getElementById("subjectRoom").value,
+        thaiDate: getThaiDate(),
+        thaiTime: getThaiTime(),
+        imageBase64: uploadedImageBase64 || "",
+    };
 
-            // Disable ปุ่มป้องกันกดซ้ำ
-            const submitBtn = document.getElementById("submitBtn");
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังบันทึก...`;
+    try {
+        const token = liff.getDecodedIDToken();
+        data.uid = token?.sub || "";
+        data.uname = token?.name || "";
+        data.uimg = token?.picture || "";
+    } catch (e) { }
 
-            showLoading("กำลังบันทึกข้อมูล...");
+    const submitBtn = document.getElementById("submitBtn");
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังบันทึก...`;
 
-            // ── STEP 1: บันทึกลง Sheet ก่อน ──
-            $.ajax({
-                method: "POST",
-                url: SCRIPT_URL,
-                data: data,
-                dataType: "json",
-                success: (res) => {
-                    hideLoading();
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+    showLoading("กำลังบันทึกและเตรียมแชร์...");
 
-                    if (res.status === "success") {
-                        // ── STEP 2: นำค่าจาก Sheet response มาสร้าง Flex ──
-                        const imgUrl = res.imageUrl && res.imageUrl.length > 10
-                            ? res.imageUrl
-                            : "https://lh3.googleusercontent.com/d/1hTcB5YnvnJtMg0l4fIO5Jo20QbKF5_wh";
+    $.ajax({
+        method: "POST",
+        url: SCRIPT_URL,
+        data: data,
+        dataType: "json",
+        success: (res) => {
+            hideLoading();
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
 
-                        window._pendingFlex = buildFlexMessage(data, imgUrl);
+            if (res.status === "success") {
+                const imgUrl = res.imageUrl && res.imageUrl.length > 10
+                    ? res.imageUrl
+                    : "https://lh3.googleusercontent.com/d/1hTcB5YnvnJtMg0l4fIO5Jo20QbKF5_wh";
 
-                        // ── STEP 3: ตรวจสอบว่าอยู่ใน LINE Client หรือไม่ เพื่อจัดการการแชร์ ──
-                        const isInLine = liff.isInClient();
+                const flexMessage = buildFlexMessage(data, imgUrl);
 
-                        // ── STEP 4: แสดง popup แจ้งบันทึกสำเร็จ พร้อมปุ่มแชร์ (เฉพาะใน LINE) ──
+                // ตรวจสอบว่า shareTargetPicker ใช้ได้ไหม (สำคัญมาก!)
+                if (!liff.isApiAvailable('shareTargetPicker')) {
+                    Swal.fire({
+                        icon: "warning",
+                        title: "ไม่สามารถแชร์ได้",
+                        text: "ฟีเจอร์แชร์ไม่รองรับใน LINE เวอร์ชันนี้ หรือเปิดในเบราว์เซอร์ภายนอก กรุณาเปิดใน LINE แอป",
+                        confirmButtonText: "ตกลง",
+                        background: "#1e293b",
+                        color: "#fff",
+                    }).then(() => {
+                        resetForm();
+                        showPage("page-form");
+                    });
+                    return;
+                }
+
+                // แชร์เลยทันที (เรียกตรงจาก user gesture ของปุ่ม submit)
+                showLoading("กำลังเปิดหน้าตัวเลือกแชร์...");
+                liff.shareTargetPicker([flexMessage], { isMultiple: true })
+                    .then(() => {
+                        hideLoading();
+                        showToast("✅ บันทึกและแชร์สำเร็จ!");
+                        resetForm();
+                        showPage("page-form");
+                    })
+                    .catch(err => {
+                        hideLoading();
+                        console.error("Share error:", err);
                         Swal.fire({
-                            icon: "success",
-                            title: "✅ บันทึกสำเร็จ!",
-                            html: isInLine ? `<p class="text-sm">กดปุ่มด้านล่างเพื่อเลือกกลุ่มหรือบุคคลที่ต้องการแชร์</p>` : `<p class="text-sm">การแชร์ไม่พร้อมใช้งานในเบราว์เซอร์ภายนอก (กรุณาเปิดใน LINE)</p>`,
-                            confirmButtonText: isInLine ? "📤 แชร์เลย!" : "ตกลง",
-                            confirmButtonColor: "#22c55e",
-                            showCancelButton: isInLine,
-                            cancelButtonText: "ข้ามการแชร์",
+                            icon: "error",
+                            title: "แชร์ไม่สำเร็จ",
+                            html: `แต่ข้อมูลบันทึกเรียบร้อยแล้ว<br><small>${err.message || err}</small>`,
+                            confirmButtonText: "ตกลง",
                             background: "#1e293b",
                             color: "#fff",
-                        }).then(result => {
-                            if (result.isConfirmed && isInLine) {
-                                // ── STEP 5: เรียก shareTargetPicker โดยตรงจาก user gesture (ภายใน .then ของ Swal) ──
-                                liff.shareTargetPicker([window._pendingFlex], { isMultiple: true })
-                                    .then(() => {
-                                        window._pendingFlex = null;
-                                        resetForm();
-                                        showPage("page-form");
-                                        showToast("✅ แชร์และบันทึกสำเร็จ!");
-                                    })
-                                    .catch(err => {
-                                        console.error("shareTargetPicker error:", err);
-                                        window._pendingFlex = null;
-                                        showToast("⚠️ แชร์ไม่สำเร็จ แต่บันทึกในระบบแล้ว");
-                                        resetForm();
-                                        showPage("page-form");
-                                    });
-                            } else {
-                                // ข้ามการแชร์ หรือใน external browser — reset form เลย
-                                window._pendingFlex = null;
-                                resetForm();
-                                showPage("page-form");
-                            }
+                        }).then(() => {
+                            resetForm();
+                            showPage("page-form");
                         });
-
-                    } else {
-                        Swal.fire({
-                            icon: "error", title: "บันทึกไม่สำเร็จ",
-                            text: res.message || "กรุณาลองใหม่",
-                            background: "#1e293b", color: "#fff",
-                        });
-                    }
-                },
-                error: () => {
-                    hideLoading();
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
-                    Swal.fire({
-                        icon: "error", title: "ไม่สามารถเชื่อมต่อได้",
-                        text: "กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต",
-                        background: "#1e293b", color: "#fff",
                     });
-                }
+
+            } else {
+                Swal.fire({
+                    icon: "error",
+                    title: "บันทึกไม่สำเร็จ",
+                    text: res.message || "กรุณาลองใหม่",
+                    background: "#1e293b",
+                    color: "#fff",
+                });
+            }
+        },
+        error: () => {
+            hideLoading();
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+            Swal.fire({
+                icon: "error",
+                title: "ไม่สามารถเชื่อมต่อได้",
+                text: "กรุณาตรวจสอบอินเทอร์เน็ต",
+                background: "#1e293b",
+                color: "#fff",
             });
         }
+    });
+}Ï
 
         // ==============================
         // BUILD FLEX MESSAGE
