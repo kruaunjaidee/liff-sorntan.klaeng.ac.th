@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="th">
-
 <head>
     <meta charset="UTF-8" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
@@ -13,18 +12,15 @@
     <style>
         * { box-sizing: border-box; }
         body { font-family: "Kanit", sans-serif; }
-
         .glow-green { text-shadow: 0 0 8px rgba(74,222,128,0.9), 0 0 20px rgba(74,222,128,0.5); }
-        .glow-blue  { text-shadow: 0 0 6px rgba(99,179,237,0.8); }
-        .glow-pink  { text-shadow: 0 0 6px rgba(236,72,153,0.8); }
-
+        .glow-blue { text-shadow: 0 0 6px rgba(99,179,237,0.8); }
+        .glow-pink { text-shadow: 0 0 6px rgba(236,72,153,0.8); }
         .glass-card {
             background: rgba(255,255,255,0.05);
             border: 1px solid rgba(255,255,255,0.12);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
         }
-
         select, input[type="text"] {
             background: rgba(30,41,59,0.8) !important;
             border: 1.5px solid rgba(99,179,237,0.3) !important;
@@ -37,7 +33,6 @@
             outline: none;
         }
         select option { background: #1e293b; color: #fff; }
-
         .upload-zone {
             border: 2px dashed rgba(99,179,237,0.4);
             transition: border-color 0.2s, background 0.2s;
@@ -48,34 +43,27 @@
             background: rgba(74,222,128,0.05);
         }
         .upload-zone img { max-height: 160px; object-fit: contain; }
-
         .page { display: none; animation: fadeIn 0.4s ease; }
         .page.active { display: block; }
         @keyframes fadeIn {
             from { opacity:0; transform:translateY(12px); }
-            to   { opacity:1; transform:translateY(0); }
+            to { opacity:1; transform:translateY(0); }
         }
-
         .confirm-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08); }
         .confirm-row:last-child { border-bottom: none; }
         .confirm-label { color:#94a3b8; font-size:0.85rem; }
         .confirm-value { color:#fff; font-weight:600; font-size:0.9rem; text-align:right; max-width:60%; }
-
         .btn-primary { background:linear-gradient(135deg,#3b82f6,#1d4ed8); transition:all 0.2s; }
         .btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(59,130,246,0.4); }
         .btn-success { background:linear-gradient(135deg,#22c55e,#15803d); transition:all 0.2s; }
         .btn-success:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(34,197,94,0.4); }
         .btn-gray { background:rgba(71,85,105,0.6); border:1px solid rgba(148,163,184,0.2); transition:all 0.2s; }
         .btn-gray:hover { background:rgba(100,116,139,0.6); transform:translateY(-2px); }
-        .btn-line { background:linear-gradient(135deg,#06c755,#04a044); transition:all 0.2s; }
-        .btn-line:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(6,199,85,0.4); }
-
         .badge-blue {
             background:rgba(59,130,246,0.2); color:#93c5fd;
             border:1px solid rgba(59,130,246,0.3);
             border-radius:9999px; padding:2px 10px; font-size:0.75rem;
         }
-
         #loadingOverlay {
             display:none; position:fixed; inset:0;
             background:rgba(0,0,0,0.7); z-index:9999;
@@ -90,7 +78,6 @@
             animation:spin 0.8s linear infinite;
         }
         @keyframes spin { to { transform:rotate(360deg); } }
-
         #toast {
             position:fixed; bottom:80px; left:50%; transform:translateX(-50%);
             background:#1e293b; border:1px solid #4ade80; color:#fff;
@@ -99,7 +86,6 @@
             pointer-events:none; white-space:nowrap;
         }
         #toast.show { opacity:1; }
-
         #imgPreviewWrapper { position:relative; }
         #removeImgBtn {
             position:absolute; top:8px; right:8px;
@@ -107,27 +93,8 @@
             width:28px; height:28px; border-radius:50%; cursor:pointer;
             font-size:1rem; display:flex; align-items:center; justify-content:center;
         }
-
-        .success-icon { font-size:4rem; animation:popIn 0.5s cubic-bezier(0.175,0.885,0.32,1.275); }
-        @keyframes popIn {
-            from { transform:scale(0); opacity:0; }
-            to   { transform:scale(1); opacity:1; }
-        }
-
-        /* Banner แจ้งเตือนเปิดใน LINE */
-        #liff-redirect-banner {
-            display:none;
-            position:fixed; inset:0; z-index:10000;
-            background:rgba(0,0,0,0.92);
-            align-items:center; justify-content:center;
-            flex-direction:column; gap:20px;
-            padding:24px;
-        }
-        #liff-redirect-banner.show { display:flex; }
-        .line-logo { font-size:4rem; }
     </style>
 </head>
-
 <body class="bg-gradient-to-br from-slate-900 via-gray-900 to-black text-white min-h-screen flex flex-col items-center justify-start p-4 sm:p-6 pb-24">
 
     <!-- LOADING OVERLAY -->
@@ -139,25 +106,6 @@
     <!-- TOAST -->
     <div id="toast"></div>
 
-    <!-- ===== LIFF REDIRECT BANNER (เปิดใน browser ธรรมดา) ===== -->
-    <div id="liff-redirect-banner">
-        <div class="line-logo">💬</div>
-        <div class="glass-card rounded-2xl p-6 text-center max-w-sm w-full">
-            <h2 class="text-xl font-bold text-green-400 glow-green mb-2">เปิดใน LINE</h2>
-            <p class="text-slate-300 text-sm mb-1">ระบบนี้ต้องใช้งานผ่าน <strong>LINE App</strong></p>
-            <p class="text-slate-400 text-xs mb-5">เพื่อให้ฟีเจอร์แชร์และล็อกอินทำงานได้อย่างถูกต้อง</p>
-            <a id="openInLineBtn" href="#"
-                class="btn-line block w-full text-white font-semibold py-3 rounded-xl text-center mb-3">
-                <i class="bi bi-box-arrow-up-right mr-1"></i> เปิดใน LINE App
-            </a>
-            <button id="continueAnywayBtn"
-                class="btn-gray w-full text-white font-semibold py-3 rounded-xl text-sm">
-                ใช้งานต่อในเบราว์เซอร์นี้ (บางฟีเจอร์อาจไม่ทำงาน)
-            </button>
-        </div>
-        <p class="text-slate-500 text-xs mt-2">หากมีปัญหา กด "ใช้งานต่อ" ด้านบน</p>
-    </div>
-
     <!-- HEADER -->
     <div class="text-center mb-6 mt-2">
         <img src="https://lh3.googleusercontent.com/d/1hTcB5YnvnJtMg0l4fIO5Jo20QbKF5_wh"
@@ -167,7 +115,7 @@
         <h5 class="text-base text-pink-400 glow-pink mt-1">ครูอั๋น ใจดี</h5>
     </div>
 
-    <!-- ===== PAGE 1: FORM ===== -->
+    <!-- PAGE 1: FORM -->
     <div class="page active w-full max-w-xl" id="page-form">
         <div class="glass-card rounded-2xl shadow-2xl p-6 sm:p-8 space-y-5">
             <div class="flex items-center gap-2 mb-2">
@@ -279,7 +227,7 @@
         </div>
     </div>
 
-    <!-- ===== PAGE 2: CONFIRM ===== -->
+    <!-- PAGE 2: CONFIRM -->
     <div class="page w-full max-w-xl" id="page-confirm">
         <div class="glass-card rounded-2xl shadow-2xl p-6 sm:p-8">
             <div class="flex items-center gap-2 mb-5">
@@ -321,14 +269,12 @@
     </footer>
 
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-
     <script>
         // ============================================================
         // CONFIG
         // ============================================================
-        const SCRIPT_URL   = "https://script.google.com/macros/s/AKfycbw8FMpndZve9-cBaR76IBFDxHSFpZtNt_k5WyJ-mPtTO5GHaTf64dlz79kkwTufpDhP/exec";
-        const LIFF_ID      = "2000563749-Yh67UIqr";
-        const LIFF_URL     = `https://liff.line.me/${LIFF_ID}`;
+        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw8FMpndZve9-cBaR76IBFDxHSFpZtNt_k5WyJ-mPtTO5GHaTf64dlz79kkwTufpDhP/exec";
+        const LIFF_ID = "2000563749-Yh67UIqr";  // ← เปลี่ยนเป็น LIFF ID จริงของคุณที่นี่ !!!
         const FALLBACK_IMG = "https://lh3.googleusercontent.com/d/1hTcB5YnvnJtMg0l4fIO5Jo20QbKF5_wh";
 
         // ============================================================
@@ -339,27 +285,34 @@
             document.getElementById(id).classList.add("active");
             window.scrollTo({ top: 0, behavior: "smooth" });
         }
+
         function showLoading(text = "กำลังบันทึกข้อมูล...") {
             document.getElementById("loadingText").textContent = text;
             document.getElementById("loadingOverlay").classList.add("show");
         }
+
         function hideLoading() {
             document.getElementById("loadingOverlay").classList.remove("show");
         }
+
         function showToast(msg, ms = 3000) {
             const t = document.getElementById("toast");
-            t.textContent = msg; t.classList.add("show");
+            t.textContent = msg;
+            t.classList.add("show");
             setTimeout(() => t.classList.remove("show"), ms);
         }
+
         function getThaiDate() {
             const d = new Date();
-            const days   = ["อาทิตย์","จันทร์","อังคาร","พุธ","พฤหัสบดี","ศุกร์","เสาร์"];
+            const days = ["อาทิตย์","จันทร์","อังคาร","พุธ","พฤหัสบดี","ศุกร์","เสาร์"];
             const months = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
             return `วัน${days[d.getDay()]}ที่ ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()+543}`;
         }
+
         function getThaiTime() {
             return new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"}) + " น.";
         }
+
         function resetForm() {
             ["nameTeacher","nameTeacherSave","numberAtPeriod","subjectSave","subjectRoom"]
                 .forEach(id => document.getElementById(id).value = "");
@@ -370,57 +323,17 @@
         }
 
         // ============================================================
-        // CLIENT CHECK — เช็คก่อนว่าอยู่ใน LINE App หรือเปล่า
-        // ============================================================
-
-        /**
-         * ตรวจสอบว่า User Agent เป็น LINE App จริงๆ ไหม
-         * LINE App จะมี "Line/" หรือ "LIFF" ใน UA
-         */
-        function isLineInternalBrowser() {
-            const ua = navigator.userAgent || "";
-            return /Line\//i.test(ua) || /LIFF/i.test(ua);
-        }
-
-        /**
-         * สร้าง URL สำหรับเปิด LINE App
-         * - iOS: line://app/<liffPath>
-         * - Android + fallback: https://liff.line.me/<LIFF_ID>
-         */
-        function buildOpenInLineUrl() {
-            const currentPath = window.location.pathname + window.location.search + window.location.hash;
-            return LIFF_URL;
-        }
-
-        /**
-         * แสดง Banner แนะนำให้เปิดใน LINE
-         * พร้อมปุ่ม "เปิดใน LINE App" และ "ใช้งานต่อในเบราว์เซอร์"
-         */
-        function showRedirectBanner() {
-            const banner = document.getElementById("liff-redirect-banner");
-            const openBtn = document.getElementById("openInLineBtn");
-            openBtn.href = buildOpenInLineUrl();
-            banner.classList.add("show");
-        }
-
-        document.getElementById("continueAnywayBtn").addEventListener("click", () => {
-            document.getElementById("liff-redirect-banner").classList.remove("show");
-            // ยังคง init LIFF ต่อแม้จะอยู่นอก LINE (เพื่อ fallback)
-            initLiff();
-        });
-
-        // ============================================================
         // IMAGE UPLOAD
         // ============================================================
         let uploadedImageBase64 = null;
-        const uploadZone        = document.getElementById("uploadZone");
-        const fileInput         = document.getElementById("fileInput");
-        const imgPreview        = document.getElementById("imgPreview");
+        const uploadZone = document.getElementById("uploadZone");
+        const fileInput = document.getElementById("fileInput");
+        const imgPreview = document.getElementById("imgPreview");
         const imgPreviewWrapper = document.getElementById("imgPreviewWrapper");
         const uploadPlaceholder = document.getElementById("uploadPlaceholder");
 
         uploadZone.addEventListener("click", () => fileInput.click());
-        uploadZone.addEventListener("dragover",  e => { e.preventDefault(); uploadZone.classList.add("dragover"); });
+        uploadZone.addEventListener("dragover", e => { e.preventDefault(); uploadZone.classList.add("dragover"); });
         uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("dragover"));
         uploadZone.addEventListener("drop", e => {
             e.preventDefault(); uploadZone.classList.remove("dragover");
@@ -430,7 +343,7 @@
 
         function processFile(file) {
             if (!file.type.startsWith("image/")) { showToast("⚠️ กรุณาเลือกไฟล์รูปภาพเท่านั้น"); return; }
-            if (file.size > 5*1024*1024)          { showToast("⚠️ ไฟล์ใหญ่เกิน 5MB"); return; }
+            if (file.size > 5*1024*1024) { showToast("⚠️ ไฟล์ใหญ่เกิน 5MB"); return; }
             const reader = new FileReader();
             reader.onload = e => {
                 uploadedImageBase64 = e.target.result.split(",")[1];
@@ -440,6 +353,7 @@
             };
             reader.readAsDataURL(file);
         }
+
         document.getElementById("removeImgBtn").addEventListener("click", e => {
             e.stopPropagation(); uploadedImageBase64 = null; fileInput.value = "";
             imgPreviewWrapper.classList.add("hidden"); uploadPlaceholder.classList.remove("hidden");
@@ -450,24 +364,23 @@
         // ============================================================
         document.getElementById("goConfirmBtn").addEventListener("click", () => {
             const fields = [
-                {id:"nameTeacher",    label:"ชื่อผู้ลาสอน"},
+                {id:"nameTeacher", label:"ชื่อผู้ลาสอน"},
                 {id:"nameTeacherSave",label:"ชื่อผู้สอนแทน"},
                 {id:"numberAtPeriod", label:"คาบที่สอนแทน"},
-                {id:"subjectSave",    label:"วิชาที่สอนแทน"},
-                {id:"subjectRoom",    label:"ห้องที่สอนแทน"},
+                {id:"subjectSave", label:"วิชาที่สอนแทน"},
+                {id:"subjectRoom", label:"ห้องที่สอนแทน"},
             ];
             for (const f of fields) {
                 const el = document.getElementById(f.id);
                 if (!el.value.trim()) { showToast(`⚠️ กรุณากรอก: ${f.label}`); el.focus(); return; }
             }
-            document.getElementById("c-nameTeacher").textContent    = document.getElementById("nameTeacher").value;
+            document.getElementById("c-nameTeacher").textContent = document.getElementById("nameTeacher").value;
             document.getElementById("c-nameTeacherSave").textContent = document.getElementById("nameTeacherSave").value;
-            document.getElementById("c-numberAtPeriod").textContent  = "คาบ " + document.getElementById("numberAtPeriod").value;
-            document.getElementById("c-subjectSave").textContent     = document.getElementById("subjectSave").value;
-            document.getElementById("c-subjectRoom").textContent     = document.getElementById("subjectRoom").value;
-            document.getElementById("c-date").textContent            = getThaiDate();
-            document.getElementById("c-time").textContent            = getThaiTime();
-
+            document.getElementById("c-numberAtPeriod").textContent = "คาบ " + document.getElementById("numberAtPeriod").value;
+            document.getElementById("c-subjectSave").textContent = document.getElementById("subjectSave").value;
+            document.getElementById("c-subjectRoom").textContent = document.getElementById("subjectRoom").value;
+            document.getElementById("c-date").textContent = getThaiDate();
+            document.getElementById("c-time").textContent = getThaiTime();
             if (uploadedImageBase64) {
                 document.getElementById("confirmImgPreview").src = imgPreview.src;
                 document.getElementById("confirmImgBlock").classList.remove("hidden");
@@ -476,40 +389,45 @@
             }
             showPage("page-confirm");
         });
+
         document.getElementById("backBtn").addEventListener("click", () => showPage("page-form"));
 
         // ============================================================
-        // SUBMIT → บันทึก Sheet
+        // SUBMIT → บันทึก Sheet + แชร์ทันที
         // ============================================================
         document.getElementById("submitBtn").addEventListener("click", submitData);
 
         async function submitData() {
             const data = {
-                opt:             "savedata",
-                nameTeacher:     document.getElementById("nameTeacher").value,
+                opt: "savedata",
+                nameTeacher: document.getElementById("nameTeacher").value,
                 nameTeacherSave: document.getElementById("nameTeacherSave").value,
-                numberAtPeriod:  document.getElementById("numberAtPeriod").value,
-                subjectSave:     document.getElementById("subjectSave").value,
-                subjectRoom:     document.getElementById("subjectRoom").value,
-                thaiDate:        getThaiDate(),
-                thaiTime:        getThaiTime(),
-                imageBase64:     uploadedImageBase64 || "",
+                numberAtPeriod: document.getElementById("numberAtPeriod").value,
+                subjectSave: document.getElementById("subjectSave").value,
+                subjectRoom: document.getElementById("subjectRoom").value,
+                thaiDate: getThaiDate(),
+                thaiTime: getThaiTime(),
+                imageBase64: uploadedImageBase64 || "",
             };
 
-            // ดึงข้อมูล LIFF user ถ้ามี
             try {
                 const tk = liff.getDecodedIDToken();
-                data.uid = tk?.sub||""; data.uname = tk?.name||""; data.uimg = tk?.picture||"";
-            } catch(e) {}
+                data.uid = tk?.sub || "";
+                data.uname = tk?.name || "";
+                data.uimg = tk?.picture || "";
+            } catch (e) {
+                console.warn("ไม่สามารถดึงข้อมูลผู้ใช้ LIFF ได้", e);
+            }
 
             const btn = document.getElementById("submitBtn");
             btn.disabled = true;
             btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังบันทึก...`;
-            showLoading("กำลังบันทึกข้อมูล...");
+
+            showLoading();
 
             try {
                 const body = new URLSearchParams(data);
-                const res  = await fetch(SCRIPT_URL, { method:"POST", body });
+                const res = await fetch(SCRIPT_URL, { method: "POST", body });
                 const json = await res.json();
 
                 hideLoading();
@@ -521,38 +439,24 @@
                     const flexMsg = buildFlexMessage(data, imgUrl);
                     resetForm();
 
-                    // เช็คก่อนว่า shareTargetPicker ใช้งานได้ไหม (ต้องอยู่ใน LINE)
-                    if (liff.isApiAvailable("shareTargetPicker")) {
-                        liff.shareTargetPicker([flexMsg], { isMultiple: true })
-                            .then(() => {
-                                showToast("✅ แชร์สำเร็จ!");
-                                showPage("page-form");
-                            })
-                            .catch(err => {
-                                console.error("shareTargetPicker error:", err);
-                                showToast("⚠️ " + (err?.message || err?.code || "แชร์ไม่สำเร็จ"));
-                                showPage("page-form");
-                            });
-                    } else {
-                        // ไม่ได้อยู่ใน LINE App — แจ้งและ redirect ไป LIFF URL
-                        showToast("✅ บันทึกแล้ว! กรุณาเปิดใน LINE เพื่อแชร์");
-                        setTimeout(() => {
+                    liff.shareTargetPicker([flexMsg], { isMultiple: true })
+                        .then(() => {
+                            showToast("✅ บันทึกและแชร์สำเร็จ!");
                             showPage("page-form");
-                            // เสนอให้เปิดลิ้งค์ใน LINE
-                            if (confirm("บันทึกข้อมูลสำเร็จแล้ว!\nต้องการเปิดใน LINE App เพื่อแชร์ผลลัพธ์ไหม?")) {
-                                window.location.href = buildOpenInLineUrl();
-                            }
-                        }, 1500);
-                    }
+                        })
+                        .catch(err => {
+                            console.error("shareTargetPicker error:", err);
+                            showToast("⚠️ บันทึกสำเร็จ แต่แชร์ไม่ได้: " + (err.message || err.code || "กรุณาตรวจสอบการเชื่อมต่อ"));
+                            showPage("page-form");
+                        });
                 } else {
                     showToast("❌ บันทึกไม่สำเร็จ: " + (json.message || "กรุณาลองใหม่"));
                 }
-
-            } catch(err) {
+            } catch (err) {
                 hideLoading();
                 btn.disabled = false;
                 btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและบันทึก`;
-                showToast("❌ ไม่สามารถเชื่อมต่อได้ กรุณาตรวจสอบอินเทอร์เน็ต");
+                showToast("❌ ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาตรวจสอบอินเทอร์เน็ต");
                 console.error("fetch error:", err);
             }
         }
@@ -583,11 +487,11 @@
                                 ]
                             },
                             {type:"box", layout:"horizontal", contents:[
-                                {type:"text", text:"👩‍🏫 ผู้ลาสอน",    color:"#444444", size:"sm", weight:"bold", flex:4},
-                                {type:"text", text:d.nameTeacher,     color:"#444444", size:"sm", weight:"bold", wrap:true, flex:6, align:"end"}
+                                {type:"text", text:"👩‍🏫 ผู้ลาสอน", color:"#444444", size:"sm", weight:"bold", flex:4},
+                                {type:"text", text:d.nameTeacher, color:"#444444", size:"sm", weight:"bold", wrap:true, flex:6, align:"end"}
                             ]},
                             {type:"box", layout:"horizontal", contents:[
-                                {type:"text", text:"👨‍🏫 ผู้สอนแทน",   color:"#444444", size:"sm", weight:"bold", flex:4},
+                                {type:"text", text:"👨‍🏫 ผู้สอนแทน", color:"#444444", size:"sm", weight:"bold", flex:4},
                                 {type:"text", text:d.nameTeacherSave, color:"#444444", size:"sm", weight:"bold", wrap:true, flex:6, align:"end"}
                             ]},
                             {type:"box", layout:"horizontal", contents:[
@@ -595,21 +499,21 @@
                                 {type:"text", text:`คาบ ${d.numberAtPeriod}`, color:"#444444", size:"sm", weight:"bold", flex:6, align:"end"}
                             ]},
                             {type:"box", layout:"horizontal", contents:[
-                                {type:"text", text:"📖 วิชา",         color:"#444444", size:"sm", weight:"bold", flex:4},
-                                {type:"text", text:d.subjectSave,    color:"#444444", size:"sm", weight:"bold", wrap:true, flex:6, align:"end"}
+                                {type:"text", text:"📖 วิชา", color:"#444444", size:"sm", weight:"bold", flex:4},
+                                {type:"text", text:d.subjectSave, color:"#444444", size:"sm", weight:"bold", wrap:true, flex:6, align:"end"}
                             ]},
                             {type:"box", layout:"horizontal", contents:[
-                                {type:"text", text:"🏫 ห้องเรียน",    color:"#444444", size:"sm", weight:"bold", flex:4},
-                                {type:"text", text:d.subjectRoom,    color:"#444444", size:"sm", weight:"bold", wrap:true, flex:6, align:"end"}
+                                {type:"text", text:"🏫 ห้องเรียน", color:"#444444", size:"sm", weight:"bold", flex:4},
+                                {type:"text", text:d.subjectRoom, color:"#444444", size:"sm", weight:"bold", wrap:true, flex:6, align:"end"}
                             ]},
                             {type:"separator", margin:"md", color:"#cc88cc"},
                             {type:"box", layout:"horizontal", contents:[
-                                {type:"text", text:"📅 วันที่",       color:"#444444", size:"sm", weight:"bold", flex:4},
-                                {type:"text", text:d.thaiDate,       color:"#444444", size:"sm", weight:"bold", wrap:true, flex:6, align:"end"}
+                                {type:"text", text:"📅 วันที่", color:"#444444", size:"sm", weight:"bold", flex:4},
+                                {type:"text", text:d.thaiDate, color:"#444444", size:"sm", weight:"bold", wrap:true, flex:6, align:"end"}
                             ]},
                             {type:"box", layout:"horizontal", contents:[
-                                {type:"text", text:"🕐 เวลา",         color:"#444444", size:"sm", weight:"bold", flex:4},
-                                {type:"text", text:d.thaiTime,       color:"#444444", size:"sm", weight:"bold", flex:6, align:"end"}
+                                {type:"text", text:"🕐 เวลา", color:"#444444", size:"sm", weight:"bold", flex:4},
+                                {type:"text", text:d.thaiTime, color:"#444444", size:"sm", weight:"bold", flex:6, align:"end"}
                             ]}
                         ]
                     },
@@ -623,36 +527,21 @@
         }
 
         // ============================================================
-        // LIFF INIT
+        // LIFF INIT - แก้ไขให้แจ้ง error ชัดเจน
         // ============================================================
         document.getElementById("year").textContent = new Date().getFullYear();
 
-        function initLiff() {
-            liff.init({ liffId: LIFF_ID })
-                .then(() => {
-                    if (!liff.isLoggedIn()) {
-                        liff.login();
-                    }
-                })
-                .catch(err => console.warn("LIFF init error:", err));
-        }
-
-        /**
-         * Entry point: เช็ค client ก่อน
-         * ถ้าไม่ได้อยู่ใน LINE App → แสดง banner แนะนำ
-         * ถ้าอยู่ใน LINE App → init LIFF ปกติ
-         */
-        (function checkClientAndInit() {
-            if (isLineInternalBrowser()) {
-                // อยู่ใน LINE App แล้ว → init LIFF ตามปกติ
-                initLiff();
-            } else {
-                // เปิดใน browser ธรรมดา → แสดง banner ก่อน
-                showRedirectBanner();
-                // ยัง init LIFF ไว้เบื้องหลังเพื่อ fallback (ไม่บังคับ login ทันที)
-                liff.init({ liffId: LIFF_ID }).catch(err => console.warn("LIFF bg init error:", err));
-            }
-        })();
+        liff.init({ liffId: LIFF_ID })
+            .then(() => {
+                console.log("LIFF initialized successfully");
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                }
+            })
+            .catch(err => {
+                console.error("LIFF init failed:", err);
+                showToast("⚠️ ไม่สามารถเริ่มระบบได้: " + (err.message || "กรุณาตรวจสอบ LIFF ID หรือเปิดผ่านแอป LINE"));
+            });
     </script>
 </body>
 </html>
