@@ -494,20 +494,43 @@
         document.getElementById("shareBtn").addEventListener("click", () => {
             if (!_pendingFlex) { showToast("ไม่มีข้อมูลที่จะแชร์"); return; }
 
-            if (!liff.isApiAvailable("shareTargetPicker")) {
-                showToast("⚠️ กรุณา Login LINE ก่อนแชร์");
+            // ตรวจสอบ API พร้อมใช้หรือไม่
+            const available = liff.isApiAvailable("shareTargetPicker");
+            const loggedIn  = liff.isLoggedIn();
+
+            console.log("shareTargetPicker available:", available);
+            console.log("isLoggedIn:", loggedIn);
+            console.log("isInClient:", liff.isInClient());
+
+            if (!loggedIn) {
+                alert("กรุณา Login LINE ก่อนครับ");
+                liff.login();
+                return;
+            }
+            if (!available) {
+                alert("❌ Share Target Picker ไม่พร้อมใช้งาน\n\nกรุณาตรวจสอบ:\n1. เปิด 'Share target picker' ใน LINE Developers Console\n2. Scope: chat_message.write ต้องเปิด\n3. Deploy LIFF ใหม่หลังเปิด");
                 return;
             }
 
+            // แสดง loading ระหว่างรอ picker เปิด
+            const shareBtn = document.getElementById("shareBtn");
+            shareBtn.disabled = true;
+            shareBtn.innerHTML = `<span class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังเปิด...`;
+
             liff.shareTargetPicker([_pendingFlex], { isMultiple: true })
-                .then(() => {
+                .then((res) => {
+                    shareBtn.disabled = false;
+                    shareBtn.innerHTML = `<i class="bi bi-share-fill"></i> แชร์ Flex Message`;
                     _pendingFlex = null;
                     showToast("✅ แชร์สำเร็จ!");
                     showPage("page-form");
                 })
                 .catch(err => {
+                    shareBtn.disabled = false;
+                    shareBtn.innerHTML = `<i class="bi bi-share-fill"></i> แชร์ Flex Message`;
                     console.error("shareTargetPicker error:", err);
-                    showToast("⚠️ แชร์ไม่สำเร็จ: " + (err.message || err.code || ""));
+                    const msg = err?.message || err?.code || JSON.stringify(err);
+                    alert("แชร์ไม่สำเร็จ:\n" + msg + "\n\nกรุณาตรวจสอบ LINE Developers Console");
                 });
         });
 
