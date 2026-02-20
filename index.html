@@ -11,240 +11,85 @@
     <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css" />
     <style>
-        * {
-            box-sizing: border-box;
-        }
+        * { box-sizing: border-box; }
+        body { font-family: "Kanit", sans-serif; }
 
-        body {
-            font-family: "Kanit", sans-serif;
-        }
-
-        .glow-green {
-            text-shadow: 0 0 8px rgba(74, 222, 128, 0.9), 0 0 20px rgba(74, 222, 128, 0.5);
-        }
-
-        .glow-blue {
-            text-shadow: 0 0 6px rgba(99, 179, 237, 0.8);
-        }
-
-        .glow-pink {
-            text-shadow: 0 0 6px rgba(236, 72, 153, 0.8);
-        }
+        .glow-green { text-shadow: 0 0 8px rgba(74,222,128,0.9), 0 0 20px rgba(74,222,128,0.5); }
+        .glow-blue  { text-shadow: 0 0 6px rgba(99,179,237,0.8); }
+        .glow-pink  { text-shadow: 0 0 6px rgba(236,72,153,0.8); }
 
         .glass-card {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.12);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
         }
 
-        select,
-        input[type="text"] {
-            background: rgba(30, 41, 59, 0.8) !important;
-            border: 1.5px solid rgba(99, 179, 237, 0.3) !important;
+        select, input[type="text"] {
+            background: rgba(30,41,59,0.8) !important;
+            border: 1.5px solid rgba(99,179,237,0.3) !important;
             color: #fff !important;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
-
-        select:focus,
-        input[type="text"]:focus {
+        select:focus, input[type="text"]:focus {
             border-color: #4ade80 !important;
-            box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.2) !important;
+            box-shadow: 0 0 0 3px rgba(74,222,128,0.2) !important;
             outline: none;
         }
-
-        select option {
-            background: #1e293b;
-            color: #fff;
-        }
+        select option { background: #1e293b; color: #fff; }
 
         .upload-zone {
-            border: 2px dashed rgba(99, 179, 237, 0.4);
+            border: 2px dashed rgba(99,179,237,0.4);
             transition: border-color 0.2s, background 0.2s;
             cursor: pointer;
         }
-
-        .upload-zone:hover,
-        .upload-zone.dragover {
+        .upload-zone:hover, .upload-zone.dragover {
             border-color: #4ade80;
-            background: rgba(74, 222, 128, 0.05);
+            background: rgba(74,222,128,0.05);
         }
+        .upload-zone img { max-height: 160px; object-fit: contain; }
 
-        .upload-zone img {
-            max-height: 160px;
-            object-fit: contain;
-        }
+        .page { display: none; animation: fadeIn 0.4s ease; }
+        .page.active { display: block; }
+        @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
 
-        /* Page transitions */
-        .page {
-            display: none;
-            animation: fadeIn 0.4s ease;
-        }
+        .confirm-row { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.08); }
+        .confirm-row:last-child { border-bottom:none; }
+        .confirm-label { color:#94a3b8; font-size:0.85rem; }
+        .confirm-value { color:#fff; font-weight:600; font-size:0.9rem; text-align:right; max-width:60%; }
 
-        .page.active {
-            display: block;
-        }
+        .btn-primary { background:linear-gradient(135deg,#3b82f6,#1d4ed8); transition:all 0.2s; }
+        .btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(59,130,246,0.4); }
+        .btn-success { background:linear-gradient(135deg,#22c55e,#15803d); transition:all 0.2s; }
+        .btn-success:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(34,197,94,0.4); }
+        .btn-gray { background:rgba(71,85,105,0.6); border:1px solid rgba(148,163,184,0.2); transition:all 0.2s; }
+        .btn-gray:hover { background:rgba(100,116,139,0.6); transform:translateY(-2px); }
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(12px);
-            }
+        .badge-blue { background:rgba(59,130,246,0.2); color:#93c5fd; border:1px solid rgba(59,130,246,0.3); border-radius:9999px; padding:2px 10px; font-size:0.75rem; }
 
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
+        #loadingOverlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:9999; align-items:center; justify-content:center; flex-direction:column; gap:16px; }
+        #loadingOverlay.show { display:flex; }
+        .spinner { width:48px; height:48px; border:4px solid rgba(74,222,128,0.2); border-top-color:#4ade80; border-radius:50%; animation:spin 0.8s linear infinite; }
+        @keyframes spin { to { transform:rotate(360deg); } }
 
-        /* Confirm card */
-        .confirm-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        }
+        #toast { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:#1e293b; border:1px solid #4ade80; color:#fff; padding:12px 24px; border-radius:12px; font-size:0.9rem; z-index:9998; opacity:0; transition:opacity 0.3s; pointer-events:none; white-space:nowrap; }
+        #toast.show { opacity:1; }
 
-        .confirm-row:last-child {
-            border-bottom: none;
-        }
+        #imgPreviewWrapper { position:relative; }
+        #removeImgBtn { position:absolute; top:8px; right:8px; background:rgba(239,68,68,0.8); border:none; color:#fff; width:28px; height:28px; border-radius:50%; cursor:pointer; font-size:1rem; display:flex; align-items:center; justify-content:center; }
 
-        .confirm-label {
-            color: #94a3b8;
-            font-size: 0.85rem;
-        }
+        .platform-badge { display:inline-flex; align-items:center; gap:6px; padding:4px 14px; border-radius:9999px; font-size:0.75rem; font-weight:600; }
+        .platform-line  { background:rgba(6,199,85,0.15); color:#06c755; border:1px solid rgba(6,199,85,0.3); }
+        .platform-web   { background:rgba(99,179,237,0.15); color:#63b3ed; border:1px solid rgba(99,179,237,0.3); }
 
-        .confirm-value {
-            color: #fff;
-            font-weight: 600;
-            font-size: 0.9rem;
-            text-align: right;
-            max-width: 60%;
-        }
-
-        /* Button */
-        .btn-primary {
-            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-            transition: all 0.2s;
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
-        }
-
-        .btn-success {
-            background: linear-gradient(135deg, #22c55e, #15803d);
-            transition: all 0.2s;
-        }
-
-        .btn-success:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(34, 197, 94, 0.4);
-        }
-
-        .btn-gray {
-            background: rgba(71, 85, 105, 0.6);
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            transition: all 0.2s;
-        }
-
-        .btn-gray:hover {
-            background: rgba(100, 116, 139, 0.6);
-            transform: translateY(-2px);
-        }
-
-        /* Badge */
-        .badge-blue {
-            background: rgba(59, 130, 246, 0.2);
-            color: #93c5fd;
-            border: 1px solid rgba(59, 130, 246, 0.3);
-            border-radius: 9999px;
-            padding: 2px 10px;
-            font-size: 0.75rem;
-        }
-
-        /* Loading overlay */
-        #loadingOverlay {
-            display: none;
-            position: fixed;
-            inset: 0;
-            background: rgba(0, 0, 0, 0.7);
-            z-index: 9999;
-            align-items: center;
-            justify-content: center;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        #loadingOverlay.show {
-            display: flex;
-        }
-
-        .spinner {
-            width: 48px;
-            height: 48px;
-            border: 4px solid rgba(74, 222, 128, 0.2);
-            border-top-color: #4ade80;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
-        }
-
-        /* Toast */
-        #toast {
-            position: fixed;
-            bottom: 80px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #1e293b;
-            border: 1px solid #4ade80;
-            color: #fff;
-            padding: 12px 24px;
-            border-radius: 12px;
-            font-size: 0.9rem;
-            z-index: 9998;
-            opacity: 0;
-            transition: opacity 0.3s;
-            pointer-events: none;
-            white-space: nowrap;
-        }
-
-        #toast.show {
-            opacity: 1;
-        }
-
-        /* Image preview */
-        #imgPreviewWrapper {
-            position: relative;
-        }
-
-        #removeImgBtn {
-            position: absolute;
-            top: 8px;
-            right: 8px;
-            background: rgba(239, 68, 68, 0.8);
-            border: none;
-            color: #fff;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            cursor: pointer;
-            font-size: 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+        /* สรุปข้อความ copy */
+        .summary-box { background:rgba(15,23,42,0.95); border:1px solid rgba(99,179,237,0.25); border-radius:10px; padding:14px 16px; font-size:0.8rem; line-height:1.9; color:#e2e8f0; white-space:pre-wrap; word-break:break-word; text-align:left; }
+        .swal-action-btn { flex:1; border:none; padding:11px 8px; border-radius:10px; cursor:pointer; font-family:Kanit,sans-serif; font-size:0.88rem; font-weight:600; display:flex; align-items:center; justify-content:center; gap:6px; color:#fff; transition:opacity 0.2s; }
+        .swal-action-btn:hover { opacity:0.88; }
     </style>
 </head>
 
-<body
-    class="bg-gradient-to-br from-slate-900 via-gray-900 to-black text-white min-h-screen flex flex-col items-center justify-start p-4 sm:p-6 pb-24">
+<body class="bg-gradient-to-br from-slate-900 via-gray-900 to-black text-white min-h-screen flex flex-col items-center justify-start p-4 sm:p-6 pb-24">
 
     <!-- LOADING OVERLAY -->
     <div id="loadingOverlay">
@@ -262,18 +107,17 @@
         <h3 class="text-2xl sm:text-3xl font-bold glow-green tracking-wide">ระบบบันทึกการสอนแทน</h3>
         <p class="text-sm text-slate-400 mt-1">ครูขาด • ลา • ไปราชการ</p>
         <h5 class="text-base text-pink-400 glow-pink mt-1">ครูอั๋น ใจดี</h5>
+        <div class="mt-2" id="platformBadge"></div>
     </div>
 
     <!-- ===== PAGE 1: FORM ===== -->
     <div class="page active w-full max-w-xl" id="page-form">
         <div class="glass-card rounded-2xl shadow-2xl p-6 sm:p-8 space-y-5">
-
             <div class="flex items-center gap-2 mb-2">
                 <i class="bi bi-pencil-square text-green-400 text-xl"></i>
                 <span class="font-semibold text-lg glow-green">กรอกข้อมูลการสอนแทน</span>
             </div>
 
-            <!-- ชื่อผู้ลาสอน -->
             <div>
                 <label class="block text-sm font-medium glow-blue mb-1">
                     <i class="bi bi-person-x-fill mr-1 text-red-400"></i>ชื่อผู้ลาสอน
@@ -298,7 +142,6 @@
                 </select>
             </div>
 
-            <!-- ชื่อผู้สอนแทน -->
             <div>
                 <label class="block text-sm font-medium glow-blue mb-1">
                     <i class="bi bi-person-check-fill mr-1 text-green-400"></i>ชื่อผู้สอนแทน
@@ -323,48 +166,40 @@
                 </select>
             </div>
 
-            <!-- คาบที่สอนแทน -->
             <div>
                 <label class="block text-sm font-medium glow-blue mb-1">
                     <i class="bi bi-clock-fill mr-1 text-yellow-400"></i>คาบที่สอนแทน
                 </label>
                 <select id="numberAtPeriod" class="w-full rounded-xl p-3 text-white" required>
                     <option value="" disabled selected>— เลือกคาบที่สอน —</option>
-                    <option value="1">คาบ 1</option>
-                    <option value="2">คาบ 2</option>
-                    <option value="3">คาบ 3</option>
-                    <option value="4">คาบ 4</option>
-                    <option value="5">คาบ 5</option>
-                    <option value="6">คาบ 6</option>
-                    <option value="7">คาบ 7</option>
-                    <option value="8">คาบ 8</option>
+                    <option value="1">คาบ 1</option><option value="2">คาบ 2</option>
+                    <option value="3">คาบ 3</option><option value="4">คาบ 4</option>
+                    <option value="5">คาบ 5</option><option value="6">คาบ 6</option>
+                    <option value="7">คาบ 7</option><option value="8">คาบ 8</option>
                     <option value="9">คาบ 9</option>
                 </select>
             </div>
 
-            <!-- วิชาที่สอนแทน -->
             <div>
                 <label class="block text-sm font-medium glow-blue mb-1">
                     <i class="bi bi-book-fill mr-1 text-blue-400"></i>วิชาที่สอนแทน
                 </label>
-                <input type="text" id="subjectSave" class="w-full rounded-xl p-3" placeholder="เช่น ภาษาไทย, คณิตศาสตร์"
-                    required />
+                <input type="text" id="subjectSave" class="w-full rounded-xl p-3"
+                    placeholder="เช่น ภาษาไทย, คณิตศาสตร์" required />
             </div>
 
-            <!-- ห้องที่สอนแทน -->
             <div>
                 <label class="block text-sm font-medium glow-blue mb-1">
                     <i class="bi bi-door-open-fill mr-1 text-purple-400"></i>ห้องที่สอนแทน
                 </label>
-                <input type="text" id="subjectRoom" class="w-full rounded-xl p-3" placeholder="เช่น ม.2/1, ม.3/4"
-                    required />
+                <input type="text" id="subjectRoom" class="w-full rounded-xl p-3"
+                    placeholder="เช่น ม.2/1, ม.3/4" required />
             </div>
 
-            <!-- อัพโหลดภาพ -->
             <div>
                 <label class="block text-sm font-medium glow-blue mb-1">
-                    <i class="bi bi-image-fill mr-1 text-pink-400"></i>แนบภาพประกอบ <span
-                        class="badge-blue ml-1">ไม่บังคับ</span>
+                    <i class="bi bi-image-fill mr-1 text-pink-400"></i>แนบภาพประกอบ
+                    <span class="badge-blue ml-1">ไม่บังคับ</span>
                 </label>
                 <div id="uploadZone" class="upload-zone rounded-xl p-4 text-center">
                     <div id="uploadPlaceholder">
@@ -380,7 +215,6 @@
                 </div>
             </div>
 
-            <!-- Submit -->
             <button type="button" id="goConfirmBtn"
                 class="btn-primary w-full text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2 text-base mt-2">
                 <i class="bi bi-arrow-right-circle-fill"></i> ตรวจสอบข้อมูลก่อนส่ง
@@ -391,40 +225,27 @@
     <!-- ===== PAGE 2: CONFIRM ===== -->
     <div class="page w-full max-w-xl" id="page-confirm">
         <div class="glass-card rounded-2xl shadow-2xl p-6 sm:p-8">
-
             <div class="flex items-center gap-2 mb-5">
                 <i class="bi bi-check2-circle text-green-400 text-2xl"></i>
                 <span class="font-bold text-xl glow-green">ยืนยันข้อมูลก่อนส่ง</span>
             </div>
-
-            <!-- Preview image if any -->
             <div id="confirmImgBlock" class="hidden mb-4">
                 <img id="confirmImgPreview" src=""
                     class="w-full max-h-44 object-cover rounded-xl border border-slate-600" />
             </div>
-
-            <div class="space-y-1 mb-6" id="confirmTable">
-                <div class="confirm-row"><span class="confirm-label">👩‍🏫 ผู้ลาสอน</span><span class="confirm-value"
-                        id="c-nameTeacher">—</span></div>
-                <div class="confirm-row"><span class="confirm-label">👨‍🏫 ผู้สอนแทน</span><span class="confirm-value"
-                        id="c-nameTeacherSave">—</span></div>
-                <div class="confirm-row"><span class="confirm-label">⏰ คาบที่</span><span class="confirm-value"
-                        id="c-numberAtPeriod">—</span></div>
-                <div class="confirm-row"><span class="confirm-label">📖 วิชา</span><span class="confirm-value"
-                        id="c-subjectSave">—</span></div>
-                <div class="confirm-row"><span class="confirm-label">🏫 ห้อง</span><span class="confirm-value"
-                        id="c-subjectRoom">—</span></div>
-                <div class="confirm-row"><span class="confirm-label">📅 วันที่</span><span class="confirm-value"
-                        id="c-date">—</span></div>
-                <div class="confirm-row"><span class="confirm-label">🕐 เวลา</span><span class="confirm-value"
-                        id="c-time">—</span></div>
+            <div class="space-y-1 mb-6">
+                <div class="confirm-row"><span class="confirm-label">👩‍🏫 ผู้ลาสอน</span><span class="confirm-value" id="c-nameTeacher">—</span></div>
+                <div class="confirm-row"><span class="confirm-label">👨‍🏫 ผู้สอนแทน</span><span class="confirm-value" id="c-nameTeacherSave">—</span></div>
+                <div class="confirm-row"><span class="confirm-label">⏰ คาบที่</span><span class="confirm-value" id="c-numberAtPeriod">—</span></div>
+                <div class="confirm-row"><span class="confirm-label">📖 วิชา</span><span class="confirm-value" id="c-subjectSave">—</span></div>
+                <div class="confirm-row"><span class="confirm-label">🏫 ห้อง</span><span class="confirm-value" id="c-subjectRoom">—</span></div>
+                <div class="confirm-row"><span class="confirm-label">📅 วันที่</span><span class="confirm-value" id="c-date">—</span></div>
+                <div class="confirm-row"><span class="confirm-label">🕐 เวลา</span><span class="confirm-value" id="c-time">—</span></div>
             </div>
-
             <p class="text-sm text-slate-400 text-center mb-5">
-                <i class="bi bi-info-circle mr-1"></i>เมื่อยืนยัน ระบบจะบันทึกและเปิดให้ <strong
-                    class="text-green-400">เลือกแชร์ไปยังบุคคลหรือกลุ่มที่ต้องการ</strong>
+                <i class="bi bi-info-circle mr-1"></i>เมื่อยืนยัน ระบบจะบันทึกและเปิดให้
+                <strong class="text-green-400">เลือกแชร์ไปยังบุคคลหรือกลุ่มที่ต้องการ</strong>
             </p>
-
             <div class="flex gap-3">
                 <button id="backBtn"
                     class="btn-gray flex-1 text-white font-semibold py-3 rounded-xl flex items-center justify-center gap-2">
@@ -439,8 +260,7 @@
     </div>
 
     <!-- FOOTER -->
-    <footer
-        class="fixed bottom-0 w-full bg-slate-900/80 backdrop-blur-sm text-center py-3 text-xs text-pink-400 glow-pink z-40">
+    <footer class="fixed bottom-0 w-full bg-slate-900/80 backdrop-blur-sm text-center py-3 text-xs text-pink-400 glow-pink z-40">
         ❤️ พัฒนาโดย ครูอั๋น ใจดี © <span id="year"></span>
     </footer>
 
@@ -448,74 +268,76 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <script>
-        // ==============================
+        // ============================================================
         // CONFIG
-        // ==============================
-        const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw8FMpndZve9-cBaR76IBFDxHSFpZtNt_k5WyJ-mPtTO5GHaTf64dlz79kkwTufpDhP/exec";
-        const LIFF_ID = "2000563749-Yh67UIqr";
+        // ============================================================
+        const SCRIPT_URL   = "https://script.google.com/macros/s/AKfycbw8FMpndZve9-cBaR76IBFDxHSFpZtNt_k5WyJ-mPtTO5GHaTf64dlz79kkwTufpDhP/exec";
+        const LIFF_ID      = "2000563749-Yh67UIqr";
+        const FALLBACK_IMG = "https://lh3.googleusercontent.com/d/1hTcB5YnvnJtMg0l4fIO5Jo20QbKF5_wh";
 
-        // ==============================
+        // ── isInLineApp ──
+        // true  = เปิดใน LINE App จริงๆ → ใช้ shareTargetPicker (Flex Message)
+        // false = เปิดใน browser/คอม   → ใช้ copy text + เปิด LINE
+        let isInLineApp = false;
+
+        // ============================================================
         // HELPERS
-        // ==============================
+        // ============================================================
         function showPage(id) {
             document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
             document.getElementById(id).classList.add("active");
             window.scrollTo({ top: 0, behavior: "smooth" });
         }
-
         function showLoading(text = "กำลังบันทึกข้อมูล...") {
             document.getElementById("loadingText").textContent = text;
             document.getElementById("loadingOverlay").classList.add("show");
         }
-        function hideLoading() {
-            document.getElementById("loadingOverlay").classList.remove("show");
-        }
-
-        function showToast(msg, duration = 3000) {
+        function hideLoading() { document.getElementById("loadingOverlay").classList.remove("show"); }
+        function showToast(msg, ms = 3000) {
             const t = document.getElementById("toast");
-            t.textContent = msg;
-            t.classList.add("show");
-            setTimeout(() => t.classList.remove("show"), duration);
+            t.textContent = msg; t.classList.add("show");
+            setTimeout(() => t.classList.remove("show"), ms);
         }
-
         function getThaiDate() {
             const d = new Date();
-            const days = ["อาทิตย์", "จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์"];
-            const months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
-            return `วัน${days[d.getDay()]}ที่ ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear() + 543}`;
+            const days   = ["อาทิตย์","จันทร์","อังคาร","พุธ","พฤหัสบดี","ศุกร์","เสาร์"];
+            const months = ["ม.ค.","ก.พ.","มี.ค.","เม.ย.","พ.ค.","มิ.ย.","ก.ค.","ส.ค.","ก.ย.","ต.ค.","พ.ย.","ธ.ค."];
+            return `วัน${days[d.getDay()]}ที่ ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()+543}`;
         }
         function getThaiTime() {
-            const d = new Date();
-            return d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }) + " น.";
+            return new Date().toLocaleTimeString("th-TH",{hour:"2-digit",minute:"2-digit"}) + " น.";
+        }
+        function resetForm() {
+            ["nameTeacher","nameTeacherSave","numberAtPeriod","subjectSave","subjectRoom"]
+                .forEach(id => document.getElementById(id).value = "");
+            uploadedImageBase64 = null;
+            document.getElementById("fileInput").value = "";
+            document.getElementById("imgPreviewWrapper").classList.add("hidden");
+            document.getElementById("uploadPlaceholder").classList.remove("hidden");
         }
 
-        // ==============================
+        // ============================================================
         // IMAGE UPLOAD
-        // ==============================
+        // ============================================================
         let uploadedImageBase64 = null;
-
-        const uploadZone = document.getElementById("uploadZone");
-        const fileInput = document.getElementById("fileInput");
-        const imgPreview = document.getElementById("imgPreview");
+        const uploadZone        = document.getElementById("uploadZone");
+        const fileInput         = document.getElementById("fileInput");
+        const imgPreview        = document.getElementById("imgPreview");
         const imgPreviewWrapper = document.getElementById("imgPreviewWrapper");
         const uploadPlaceholder = document.getElementById("uploadPlaceholder");
 
         uploadZone.addEventListener("click", () => fileInput.click());
-        uploadZone.addEventListener("dragover", e => { e.preventDefault(); uploadZone.classList.add("dragover"); });
+        uploadZone.addEventListener("dragover",  e => { e.preventDefault(); uploadZone.classList.add("dragover"); });
         uploadZone.addEventListener("dragleave", () => uploadZone.classList.remove("dragover"));
         uploadZone.addEventListener("drop", e => {
-            e.preventDefault();
-            uploadZone.classList.remove("dragover");
-            const f = e.dataTransfer.files[0];
-            if (f) processFile(f);
+            e.preventDefault(); uploadZone.classList.remove("dragover");
+            if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]);
         });
-        fileInput.addEventListener("change", () => {
-            if (fileInput.files[0]) processFile(fileInput.files[0]);
-        });
+        fileInput.addEventListener("change", () => { if (fileInput.files[0]) processFile(fileInput.files[0]); });
 
         function processFile(file) {
             if (!file.type.startsWith("image/")) { showToast("⚠️ กรุณาเลือกไฟล์รูปภาพเท่านั้น"); return; }
-            if (file.size > 5 * 1024 * 1024) { showToast("⚠️ ไฟล์ใหญ่เกิน 5MB"); return; }
+            if (file.size > 5*1024*1024)         { showToast("⚠️ ไฟล์ใหญ่เกิน 5MB"); return; }
             const reader = new FileReader();
             reader.onload = e => {
                 uploadedImageBase64 = e.target.result.split(",")[1];
@@ -525,367 +347,331 @@
             };
             reader.readAsDataURL(file);
         }
-
         document.getElementById("removeImgBtn").addEventListener("click", e => {
-            e.stopPropagation();
-            uploadedImageBase64 = null;
-            fileInput.value = "";
-            imgPreviewWrapper.classList.add("hidden");
-            uploadPlaceholder.classList.remove("hidden");
+            e.stopPropagation(); uploadedImageBase64 = null; fileInput.value = "";
+            imgPreviewWrapper.classList.add("hidden"); uploadPlaceholder.classList.remove("hidden");
         });
 
-        // ==============================
-        // FORM VALIDATION → GO CONFIRM
-        // ==============================
+        // ============================================================
+        // FORM → CONFIRM
+        // ============================================================
         document.getElementById("goConfirmBtn").addEventListener("click", () => {
             const fields = [
-                { id: "nameTeacher", label: "ชื่อผู้ลาสอน" },
-                { id: "nameTeacherSave", label: "ชื่อผู้สอนแทน" },
-                { id: "numberAtPeriod", label: "คาบที่สอนแทน" },
-                { id: "subjectSave", label: "วิชาที่สอนแทน" },
-                { id: "subjectRoom", label: "ห้องที่สอนแทน" },
+                {id:"nameTeacher",    label:"ชื่อผู้ลาสอน"},
+                {id:"nameTeacherSave",label:"ชื่อผู้สอนแทน"},
+                {id:"numberAtPeriod", label:"คาบที่สอนแทน"},
+                {id:"subjectSave",    label:"วิชาที่สอนแทน"},
+                {id:"subjectRoom",    label:"ห้องที่สอนแทน"},
             ];
             for (const f of fields) {
                 const el = document.getElementById(f.id);
-                if (!el.value.trim()) {
-                    showToast(`⚠️ กรุณากรอก: ${f.label}`);
-                    el.focus();
-                    return;
-                }
+                if (!el.value.trim()) { showToast(`⚠️ กรุณากรอก: ${f.label}`); el.focus(); return; }
             }
-            // Populate confirm page
-            document.getElementById("c-nameTeacher").textContent = document.getElementById("nameTeacher").value;
+            document.getElementById("c-nameTeacher").textContent    = document.getElementById("nameTeacher").value;
             document.getElementById("c-nameTeacherSave").textContent = document.getElementById("nameTeacherSave").value;
-            document.getElementById("c-numberAtPeriod").textContent = "คาบ " + document.getElementById("numberAtPeriod").value;
-            document.getElementById("c-subjectSave").textContent = document.getElementById("subjectSave").value;
-            document.getElementById("c-subjectRoom").textContent = document.getElementById("subjectRoom").value;
-            document.getElementById("c-date").textContent = getThaiDate();
-            document.getElementById("c-time").textContent = getThaiTime();
+            document.getElementById("c-numberAtPeriod").textContent  = "คาบ " + document.getElementById("numberAtPeriod").value;
+            document.getElementById("c-subjectSave").textContent     = document.getElementById("subjectSave").value;
+            document.getElementById("c-subjectRoom").textContent     = document.getElementById("subjectRoom").value;
+            document.getElementById("c-date").textContent            = getThaiDate();
+            document.getElementById("c-time").textContent            = getThaiTime();
 
-            const confirmImgBlock = document.getElementById("confirmImgBlock");
-            const confirmImgPreview = document.getElementById("confirmImgPreview");
             if (uploadedImageBase64) {
-                confirmImgPreview.src = document.getElementById("imgPreview").src;
-                confirmImgBlock.classList.remove("hidden");
+                document.getElementById("confirmImgPreview").src = imgPreview.src;
+                document.getElementById("confirmImgBlock").classList.remove("hidden");
             } else {
-                confirmImgBlock.classList.add("hidden");
+                document.getElementById("confirmImgBlock").classList.add("hidden");
             }
-
             showPage("page-confirm");
         });
-
         document.getElementById("backBtn").addEventListener("click", () => showPage("page-form"));
 
-        // ==============================
-        // SUBMIT
-        // ==============================
-        // ⚠️ KEY FIX: shareTargetPicker MUST be called synchronously from a
-        //    user-gesture (button click). Calling it inside Ajax .then() causes
-        //    LINE SDK to throw "not triggered by user action" error.
-        //    Solution: call shareTargetPicker FIRST (from click handler),
-        //    then save to Sheet inside its .then() callback.
-        // ==============================
-
-        // ==============================
-        // SAVED FLEX DATA (ใช้เก็บ flex ที่รอแชร์)
-        // ==============================
+        // ============================================================
+        // HIDDEN BUTTON — trigger shareTargetPicker จาก user gesture
+        // ============================================================
         window._pendingFlex = null;
-
-        // ปุ่มซ่อนสำหรับ trigger shareTargetPicker จาก user gesture จริงๆ
-        // (แทรกใน DOM ตอน init)
         const _shareBtn = document.createElement("button");
-        _shareBtn.id = "_shareBtn";
-        _shareBtn.style.cssText = "position:fixed;opacity:0;pointer-events:none;z-index:-1;";
+        _shareBtn.style.cssText = "position:fixed;opacity:0;pointer-events:none;z-index:-1;top:0;left:0;";
         document.body.appendChild(_shareBtn);
+
         _shareBtn.addEventListener("click", () => {
             if (!window._pendingFlex) return;
             liff.shareTargetPicker([window._pendingFlex], { isMultiple: true })
                 .then(() => {
                     window._pendingFlex = null;
-                    resetForm();
-                    showPage("page-form");
+                    resetForm(); showPage("page-form");
                     showToast("✅ แชร์และบันทึกสำเร็จ!");
                 })
                 .catch(err => {
-                    console.error("shareTargetPicker error:", err);
+                    console.error("shareTargetPicker:", err);
                     window._pendingFlex = null;
-                    showToast("⚠️ แชร์ไม่สำเร็จ แต่บันทึกในระบบแล้ว");
-                    resetForm();
-                    showPage("page-form");
+                    // fallback: ถ้า picker ล้มเหลวแม้อยู่ใน LINE App
+                    showFallbackShare(window._lastData);
                 });
         });
 
+        // ============================================================
+        // SUBMIT
+        // ============================================================
         document.getElementById("submitBtn").addEventListener("click", submitData);
 
         function submitData() {
             const data = {
-                opt: "savedata",
-                nameTeacher: document.getElementById("nameTeacher").value,
+                opt:             "savedata",
+                nameTeacher:     document.getElementById("nameTeacher").value,
                 nameTeacherSave: document.getElementById("nameTeacherSave").value,
-                numberAtPeriod: document.getElementById("numberAtPeriod").value,
-                subjectSave: document.getElementById("subjectSave").value,
-                subjectRoom: document.getElementById("subjectRoom").value,
-                thaiDate: getThaiDate(),
-                thaiTime: getThaiTime(),
-                imageBase64: uploadedImageBase64 || "",
+                numberAtPeriod:  document.getElementById("numberAtPeriod").value,
+                subjectSave:     document.getElementById("subjectSave").value,
+                subjectRoom:     document.getElementById("subjectRoom").value,
+                thaiDate:        getThaiDate(),
+                thaiTime:        getThaiTime(),
+                imageBase64:     uploadedImageBase64 || "",
             };
-
             try {
-                const token = liff.getDecodedIDToken();
-                data.uid = token?.sub || "";
-                data.uname = token?.name || "";
-                data.uimg = token?.picture || "";
-            } catch (e) { }
+                const tk = liff.getDecodedIDToken();
+                data.uid = tk?.sub||""; data.uname = tk?.name||""; data.uimg = tk?.picture||"";
+            } catch(e) {}
 
-            // Disable ปุ่มป้องกันกดซ้ำ
-            const submitBtn = document.getElementById("submitBtn");
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังบันทึก...`;
+            window._lastData = data;
 
+            const btn = document.getElementById("submitBtn");
+            btn.disabled = true;
+            btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังบันทึก...`;
             showLoading("กำลังบันทึกข้อมูล...");
 
-            // ── STEP 1: บันทึกลง Sheet ก่อน ──
+            // ── STEP 1: บันทึก Sheet ──
             $.ajax({
-                method: "POST",
-                url: SCRIPT_URL,
-                data: data,
-                dataType: "json",
+                method:"POST", url:SCRIPT_URL, data:data, dataType:"json",
                 success: (res) => {
                     hideLoading();
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
 
                     if (res.status === "success") {
-                        // ── STEP 2: นำค่าจาก Sheet response มาสร้าง Flex ──
-                        const imgUrl = res.imageUrl && res.imageUrl.length > 10
-                            ? res.imageUrl
-                            : "https://lh3.googleusercontent.com/d/1hTcB5YnvnJtMg0l4fIO5Jo20QbKF5_wh";
+                        const imgUrl = (res.imageUrl && res.imageUrl.length > 10) ? res.imageUrl : FALLBACK_IMG;
 
-                        window._pendingFlex = buildFlexMessage(data, imgUrl);
-
-                        // ── STEP 3: แสดง popup แจ้งบันทึกสำเร็จ พร้อมปุ่มแชร์ ──
-                        Swal.fire({
-                            icon: "success",
-                            title: "✅ บันทึกสำเร็จ!",
-                            html: `<p class="text-sm">กดปุ่มด้านล่างเพื่อเลือกกลุ่มหรือบุคคลที่ต้องการแชร์</p>`,
-                            confirmButtonText: "📤 แชร์เลย!",
-                            confirmButtonColor: "#22c55e",
-                            showCancelButton: true,
-                            cancelButtonText: "ข้ามการแชร์",
-                            background: "#1e293b",
-                            color: "#fff",
-                        }).then(result => {
-                            if (result.isConfirmed) {
-                                // ── STEP 4: กดปุ่มซ่อน → trigger shareTargetPicker จาก user gesture ──
-                                _shareBtn.style.pointerEvents = "auto";
-                                _shareBtn.click();
-                                _shareBtn.style.pointerEvents = "none";
-                            } else {
-                                // ข้ามการแชร์ — reset form เลย
-                                window._pendingFlex = null;
-                                resetForm();
-                                showPage("page-form");
-                            }
-                        });
-
+                        if (isInLineApp) {
+                            // ── มือถือ LINE App → shareTargetPicker ──
+                            window._pendingFlex = buildFlexMessage(data, imgUrl);
+                            Swal.fire({
+                                icon: "success",
+                                title: "✅ บันทึกสำเร็จ!",
+                                html: `<p style="font-size:0.9rem">กดปุ่มด้านล่างเพื่อ<br><strong>เลือกกลุ่มหรือบุคคลที่ต้องการแชร์</strong></p>`,
+                                confirmButtonText: "📤 เลือกปลายทางแชร์",
+                                confirmButtonColor: "#06c755",
+                                showCancelButton: true,
+                                cancelButtonText: "ข้ามการแชร์",
+                                background: "#1e293b", color: "#fff",
+                            }).then(r => {
+                                if (r.isConfirmed) {
+                                    // trigger hidden button → LINE SDK รับ user gesture
+                                    _shareBtn.style.pointerEvents = "auto";
+                                    _shareBtn.click();
+                                    _shareBtn.style.pointerEvents = "none";
+                                } else {
+                                    window._pendingFlex = null;
+                                    resetForm(); showPage("page-form");
+                                }
+                            });
+                        } else {
+                            // ── คอม / browser ทั่วไป → copy + open LINE ──
+                            showFallbackShare(data);
+                        }
                     } else {
-                        Swal.fire({
-                            icon: "error", title: "บันทึกไม่สำเร็จ",
-                            text: res.message || "กรุณาลองใหม่",
-                            background: "#1e293b", color: "#fff",
-                        });
+                        Swal.fire({icon:"error",title:"บันทึกไม่สำเร็จ",text:res.message||"กรุณาลองใหม่",background:"#1e293b",color:"#fff"});
                     }
                 },
                 error: () => {
                     hideLoading();
-                    submitBtn.disabled = false;
-                    submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
-                    Swal.fire({
-                        icon: "error", title: "ไม่สามารถเชื่อมต่อได้",
-                        text: "กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต",
-                        background: "#1e293b", color: "#fff",
-                    });
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+                    Swal.fire({icon:"error",title:"ไม่สามารถเชื่อมต่อได้",text:"กรุณาตรวจสอบอินเทอร์เน็ต",background:"#1e293b",color:"#fff"});
                 }
             });
         }
 
-        // ==============================
-        // BUILD FLEX MESSAGE
-        // ==============================
+        // ============================================================
+        // FALLBACK SHARE — คอม / browser / LINE App ที่ picker ล้มเหลว
+        // แสดงข้อความสรุป + ปุ่ม Copy + ปุ่มเปิด LINE
+        // ============================================================
+        function showFallbackShare(d) {
+            const summary = buildSummaryText(d);
+            let copied = false;
+
+            Swal.fire({
+                title: "✅ บันทึกสำเร็จ!",
+                html: `
+                    <p style="font-size:0.82rem;color:#94a3b8;margin-bottom:10px;">
+                        คัดลอกข้อความด้านล่าง แล้วนำไปวางในกลุ่ม LINE ที่ต้องการ
+                    </p>
+                    <div id="swalSummary" style="background:rgba(15,23,42,0.95);border:1px solid rgba(99,179,237,0.25);border-radius:10px;padding:14px 16px;font-size:0.78rem;line-height:1.9;color:#e2e8f0;white-space:pre-wrap;word-break:break-word;text-align:left;max-height:220px;overflow-y:auto;">${summary}</div>
+                    <div style="display:flex;gap:10px;margin-top:14px;">
+                        <button id="btnCopy"
+                            style="flex:1;background:linear-gradient(135deg,#8b5cf6,#6d28d9);color:#fff;border:none;padding:11px;border-radius:10px;cursor:pointer;font-family:Kanit,sans-serif;font-size:0.88rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;">
+                            <i class="bi bi-clipboard-fill"></i> คัดลอกข้อความ
+                        </button>
+                        <button id="btnOpenLine"
+                            style="flex:1;background:linear-gradient(135deg,#06c755,#04a044);color:#fff;border:none;padding:11px;border-radius:10px;cursor:pointer;font-family:Kanit,sans-serif;font-size:0.88rem;font-weight:600;display:flex;align-items:center;justify-content:center;gap:6px;">
+                            <i class="bi bi-chat-dots-fill"></i> เปิด LINE
+                        </button>
+                    </div>`,
+                showConfirmButton: false,
+                showCloseButton: true,
+                background: "#1e293b",
+                color: "#fff",
+                width: "92%",
+                didOpen: () => {
+                    // ── ปุ่ม Copy ──
+                    document.getElementById("btnCopy").addEventListener("click", function() {
+                        const btn = this;
+                        const doCopy = () => {
+                            btn.innerHTML = `<i class="bi bi-check2-circle"></i> คัดลอกแล้ว!`;
+                            btn.style.background = "linear-gradient(135deg,#22c55e,#15803d)";
+                            copied = true;
+                        };
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            navigator.clipboard.writeText(summary).then(doCopy).catch(() => {
+                                legacyCopy(summary); doCopy();
+                            });
+                        } else {
+                            legacyCopy(summary); doCopy();
+                        }
+                    });
+
+                    // ── ปุ่มเปิด LINE ──
+                    document.getElementById("btnOpenLine").addEventListener("click", () => {
+                        // พยายามเปิด LINE App ก่อน ถ้าไม่มีค่อยเปิด LINE Web
+                        const ua = navigator.userAgent.toLowerCase();
+                        if (/android/.test(ua)) {
+                            window.location.href = "intent://nv/chat#Intent;scheme=line;package=jp.naver.line.android;end";
+                        } else if (/iphone|ipad/.test(ua)) {
+                            window.location.href = "line://nv/chat";
+                            setTimeout(() => window.open("https://line.me/download", "_blank"), 1500);
+                        } else {
+                            window.open("https://line.me/R/nv/chat", "_blank");
+                        }
+                    });
+                }
+            }).then(() => { resetForm(); showPage("page-form"); });
+        }
+
+        function legacyCopy(text) {
+            const ta = document.createElement("textarea");
+            ta.value = text; ta.style.cssText = "position:fixed;opacity:0;";
+            document.body.appendChild(ta); ta.select();
+            document.execCommand("copy"); document.body.removeChild(ta);
+        }
+
+        // ============================================================
+        // BUILD SUMMARY TEXT  (สำหรับ copy บน browser)
+        // ============================================================
+        function buildSummaryText(d) {
+            return [
+                "📚 แจ้งการสอนแทน",
+                "ครูขาด • ลา • ไปราชการ",
+                "─────────────────────",
+                `👩‍🏫 ผู้ลาสอน     : ${d.nameTeacher}`,
+                `👨‍🏫 ผู้สอนแทน    : ${d.nameTeacherSave}`,
+                `⏰ คาบที่สอนแทน : คาบ ${d.numberAtPeriod}`,
+                `📖 วิชา         : ${d.subjectSave}`,
+                `🏫 ห้องเรียน    : ${d.subjectRoom}`,
+                "─────────────────────",
+                `📅 วันที่        : ${d.thaiDate}`,
+                `🕐 เวลา         : ${d.thaiTime}`,
+                "─────────────────────",
+                "❤️ ระบบบันทึกการสอนแทน | ครูอั๋น ใจดี",
+            ].join("\n");
+        }
+
+        // ============================================================
+        // BUILD FLEX MESSAGE  (สำหรับ LINE shareTargetPicker)
+        // ============================================================
         function buildFlexMessage(d, imgUrl) {
             return {
                 type: "flex",
                 altText: `📚 แจ้งสอนแทน | ${d.nameTeacher} → ${d.nameTeacherSave} | คาบ ${d.numberAtPeriod} | ห้อง ${d.subjectRoom}`,
                 contents: {
-                    type: "bubble",
-                    size: "mega",
+                    type: "bubble", size: "mega",
                     header: {
-                        type: "box",
-                        layout: "vertical",
-                        paddingAll: "0px",
-                        contents: [
-                            {
-                                type: "image",
-                                url: imgUrl,
-                                size: "full",
-                                aspectRatio: "16:9",
-                                aspectMode: "cover"
-                            }
-                        ]
+                        type:"box", layout:"vertical", paddingAll:"0px",
+                        contents:[{ type:"image", url:imgUrl, size:"full", aspectRatio:"16:9", aspectMode:"cover" }]
                     },
                     body: {
-                        type: "box",
-                        layout: "vertical",
-                        backgroundColor: "#ff99ff",
-                        paddingAll: "18px",
-                        spacing: "md",
-                        contents: [
+                        type:"box", layout:"vertical",
+                        backgroundColor:"#ff99ff", paddingAll:"18px", spacing:"md",
+                        contents:[
                             {
-                                type: "box",
-                                layout: "vertical",
-                                position: "relative",
-                                offsetBottom: "0px",
-                                offsetStart: "0px",
-                                offsetEnd: "0px",
-                                backgroundColor: "#00000077",
-                                paddingAll: "5px",
-                                cornerRadius: "xl",
-                                contents: [
-                                    {
-                                        type: "text",
-                                        text: "📚 แจ้งการสอนแทน",
-                                        color: "#ffffff",
-                                        size: "xl",
-                                        weight: "bold",
-                                        align: "center"
-                                    },
-                                    {
-                                        type: "text",
-                                        text: "ครูขาด • ลา • ไปราชการ",
-                                        color: "#ffffffbb",
-                                        size: "sm",
-                                        align: "center",
-                                        margin: "xs"
-                                    }
+                                type:"box", layout:"vertical",
+                                backgroundColor:"#00000077", paddingAll:"5px", cornerRadius:"xl",
+                                contents:[
+                                    {type:"text",text:"📚 แจ้งการสอนแทน",color:"#ffffff",size:"xl",weight:"bold",align:"center"},
+                                    {type:"text",text:"ครูขาด • ลา • ไปราชการ",color:"#ffffffbb",size:"sm",align:"center",margin:"xs"}
                                 ]
                             },
-                            {
-                                type: "box",
-                                layout: "horizontal",
-                                contents: [
-                                    { type: "text", text: "👩‍🏫 ผู้ลาสอน", color: "#444444", size: "sm", weight: "bold" },
-                                    { type: "text", text: d.nameTeacher, color: "#444444", size: "sm", align: "start", weight: "bold", wrap: true }
-                                ]
-                            },
-                            {
-                                type: "box",
-                                layout: "horizontal",
-                                contents: [
-                                    { type: "text", text: "👨‍🏫 ผู้สอนแทน", color: "#444444", size: "sm", weight: "bold" },
-                                    { type: "text", text: d.nameTeacherSave, color: "#444444", size: "sm", align: "start", weight: "bold", wrap: true }
-                                ]
-                            },
-                            {
-                                type: "box",
-                                layout: "horizontal",
-                                contents: [
-                                    { type: "text", text: "⏰ คาบที่สอนแทน", color: "#444444", size: "sm", weight: "bold" },
-                                    { type: "text", text: `คาบ ${d.numberAtPeriod}`, color: "#444444", size: "sm", align: "start", weight: "bold" }
-                                ]
-                            },
-                            {
-                                type: "box",
-                                layout: "horizontal",
-                                contents: [
-                                    { type: "text", text: "📖 วิชา", color: "#444444", size: "sm", weight: "bold" },
-                                    { type: "text", text: d.subjectSave, color: "#444444", size: "sm", align: "start", weight: "bold", wrap: true }
-                                ]
-                            },
-                            {
-                                type: "box",
-                                layout: "horizontal",
-                                contents: [
-                                    { type: "text", text: "🏫 ห้องเรียน", color: "#444444", size: "sm", weight: "bold" },
-                                    { type: "text", text: d.subjectRoom, color: "#444444", size: "sm", align: "start", weight: "bold", wrap: true }
-                                ]
-                            },
-                            { type: "separator", margin: "md", color: "#334155" },
-                            {
-                                type: "box",
-                                layout: "horizontal",
-                                contents: [
-                                    { type: "text", text: "📅 วันที่", color: "#444444", size: "sm", weight: "bold" },
-                                    { type: "text", text: d.thaiDate, color: "#444444", size: "sm", align: "start", weight: "bold", wrap: true }
-                                ]
-                            },
-                            {
-                                type: "box",
-                                layout: "horizontal",
-                                contents: [
-                                    { type: "text", text: "🕐 เวลา", color: "#444444", size: "sm", weight: "bold" },
-                                    { type: "text", text: d.thaiTime, color: "#444444", size: "sm", align: "start", weight: "bold" }
-                                ]
-                            }
+                            {type:"box",layout:"horizontal",contents:[
+                                {type:"text",text:"👩‍🏫 ผู้ลาสอน",    color:"#444444",size:"sm",weight:"bold",flex:4},
+                                {type:"text",text:d.nameTeacher,     color:"#444444",size:"sm",weight:"bold",wrap:true,flex:6,align:"end"}
+                            ]},
+                            {type:"box",layout:"horizontal",contents:[
+                                {type:"text",text:"👨‍🏫 ผู้สอนแทน",   color:"#444444",size:"sm",weight:"bold",flex:4},
+                                {type:"text",text:d.nameTeacherSave, color:"#444444",size:"sm",weight:"bold",wrap:true,flex:6,align:"end"}
+                            ]},
+                            {type:"box",layout:"horizontal",contents:[
+                                {type:"text",text:"⏰ คาบที่สอนแทน",color:"#444444",size:"sm",weight:"bold",flex:4},
+                                {type:"text",text:`คาบ ${d.numberAtPeriod}`,color:"#444444",size:"sm",weight:"bold",flex:6,align:"end"}
+                            ]},
+                            {type:"box",layout:"horizontal",contents:[
+                                {type:"text",text:"📖 วิชา",         color:"#444444",size:"sm",weight:"bold",flex:4},
+                                {type:"text",text:d.subjectSave,    color:"#444444",size:"sm",weight:"bold",wrap:true,flex:6,align:"end"}
+                            ]},
+                            {type:"box",layout:"horizontal",contents:[
+                                {type:"text",text:"🏫 ห้องเรียน",   color:"#444444",size:"sm",weight:"bold",flex:4},
+                                {type:"text",text:d.subjectRoom,    color:"#444444",size:"sm",weight:"bold",wrap:true,flex:6,align:"end"}
+                            ]},
+                            {type:"separator",margin:"md",color:"#cc88cc"},
+                            {type:"box",layout:"horizontal",contents:[
+                                {type:"text",text:"📅 วันที่",       color:"#444444",size:"sm",weight:"bold",flex:4},
+                                {type:"text",text:d.thaiDate,       color:"#444444",size:"sm",weight:"bold",wrap:true,flex:6,align:"end"}
+                            ]},
+                            {type:"box",layout:"horizontal",contents:[
+                                {type:"text",text:"🕐 เวลา",         color:"#444444",size:"sm",weight:"bold",flex:4},
+                                {type:"text",text:d.thaiTime,       color:"#444444",size:"sm",weight:"bold",flex:6,align:"end"}
+                            ]},
                         ]
                     },
                     footer: {
-                        type: "box",
-                        layout: "vertical",
-                        backgroundColor: "#ec4899",
-                        paddingAll: "12px",
-                        contents: [
-                            {
-                                type: "text",
-                                text: "❤️ ระบบบันทึกการสอนแทน | ครูอั๋น ใจดี",
-                                color: "#ffffff",
-                                size: "xs",
-                                align: "center",
-                                wrap: true
-                            }
-                        ]
+                        type:"box", layout:"vertical",
+                        backgroundColor:"#ec4899", paddingAll:"12px",
+                        contents:[{type:"text",text:"❤️ ระบบบันทึกการสอนแทน | ครูอั๋น ใจดี",color:"#ffffff",size:"xs",align:"center",wrap:true}]
                     }
                 }
             };
         }
 
-        // ==============================
-        // RESET FORM
-        // ==============================
-        function resetForm() {
-            document.getElementById("nameTeacher").value = "";
-            document.getElementById("nameTeacherSave").value = "";
-            document.getElementById("numberAtPeriod").value = "";
-            document.getElementById("subjectSave").value = "";
-            document.getElementById("subjectRoom").value = "";
-            uploadedImageBase64 = null;
-            document.getElementById("fileInput").value = "";
-            document.getElementById("imgPreviewWrapper").classList.add("hidden");
-            document.getElementById("uploadPlaceholder").classList.remove("hidden");
-        }
-
-        function buildRow(label, value) {
-            return {
-                type: "box",
-                layout: "horizontal",
-                contents: [
-                    { type: "text", text: label, size: "sm", color: "#94a3b8", flex: 4, wrap: true },
-                    { type: "text", text: value, size: "sm", color: "#ffffff", flex: 5, wrap: true, weight: "bold", align: "end" }
-                ],
-                margin: "sm"
-            };
-        }
-
-        // ==============================
+        // ============================================================
         // LIFF INIT
-        // ==============================
+        // ============================================================
         document.getElementById("year").textContent = new Date().getFullYear();
 
         liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true })
             .then(() => {
+                // ตรวจสอบ platform จริงๆ
+                isInLineApp = liff.isInClient() && liff.isApiAvailable("shareTargetPicker");
+
+                const badge = document.getElementById("platformBadge");
+                if (isInLineApp) {
+                    badge.innerHTML = `<span class="platform-badge platform-line"><i class="bi bi-phone-fill" style="margin-right:4px"></i>LINE App — แชร์ Flex Message ได้ทันที</span>`;
+                } else {
+                    badge.innerHTML = `<span class="platform-badge platform-web"><i class="bi bi-display" style="margin-right:4px"></i>Browser — คัดลอกข้อความเพื่อส่ง LINE</span>`;
+                }
+
                 if (!liff.isLoggedIn()) liff.login();
             })
-            .catch(err => console.warn("LIFF init error:", err));
+            .catch(err => {
+                console.warn("LIFF init error:", err);
+                isInLineApp = false;
+                document.getElementById("platformBadge").innerHTML =
+                    `<span class="platform-badge platform-web"><i class="bi bi-globe" style="margin-right:4px"></i>Browser Mode</span>`;
+            });
     </script>
 </body>
-
 </html>
