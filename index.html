@@ -586,9 +586,7 @@
         // ==============================
         window._pendingFlex = null;
 
-        <!-- ในส่วน <script> แก้ไขฟังก์ชัน submitData() เป็นแบบนี้ -->
-
-function submitData() {
+       function submitData() {
     const data = {
         opt: "savedata",
         nameTeacher: document.getElementById("nameTeacher").value,
@@ -606,96 +604,99 @@ function submitData() {
         data.uid = token?.sub || "";
         data.uname = token?.name || "";
         data.uimg = token?.picture || "";
-    } catch (e) { }
+    } catch (e) {
+        console.warn("Cannot get user profile", e);
+    }
 
     const submitBtn = document.getElementById("submitBtn");
     submitBtn.disabled = true;
-    submitBtn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังบันทึก...`;
+    submitBtn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังดำเนินการ...`;
 
     showLoading("กำลังบันทึกและเตรียมแชร์...");
 
-    $.ajax({
+    // ใช้ Promise เพื่อให้ flow ชัดเจน แต่ยังอยู่ใน user gesture chain
+    fetch(SCRIPT_URL, {
         method: "POST",
-        url: SCRIPT_URL,
-        data: data,
-        dataType: "json",
-        success: (res) => {
-            hideLoading();
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams(data).toString(),
+    })
+    .then(response => response.json())
+    .then(res => {
+        hideLoading();
 
-            if (res.status === "success") {
-                const imgUrl = res.imageUrl && res.imageUrl.length > 10
-                    ? res.imageUrl
-                    : "https://lh3.googleusercontent.com/d/1hTcB5YnvnJtMg0l4fIO5Jo20QbKF5_wh";
+        if (res.status !== "success") {
+            throw new Error(res.message || "บันทึกไม่สำเร็จ");
+        }
 
-                const flexMessage = buildFlexMessage(data, imgUrl);
+        const imgUrl = res.imageUrl && res.imageUrl.length > 10
+            ? res.imageUrl
+            : "https://lh3.googleusercontent.com/d/1hTcB5YnvnJtMg0l4fIO5Jo20QbKF5_wh";
 
-                // ตรวจสอบว่า shareTargetPicker ใช้ได้ไหม (สำคัญมาก!)
-                if (!liff.isApiAvailable('shareTargetPicker')) {
-                    Swal.fire({
-                        icon: "warning",
-                        title: "ไม่สามารถแชร์ได้",
-                        text: "ฟีเจอร์แชร์ไม่รองรับใน LINE เวอร์ชันนี้ หรือเปิดในเบราว์เซอร์ภายนอก กรุณาเปิดใน LINE แอป",
-                        confirmButtonText: "ตกลง",
-                        background: "#1e293b",
-                        color: "#fff",
-                    }).then(() => {
-                        resetForm();
-                        showPage("page-form");
-                    });
-                    return;
-                }
+        const flexMessage = buildFlexMessage(data, imgUrl);
 
-                // แชร์เลยทันที (เรียกตรงจาก user gesture ของปุ่ม submit)
-                showLoading("กำลังเปิดหน้าตัวเลือกแชร์...");
-                liff.shareTargetPicker([flexMessage], { isMultiple: true })
-                    .then(() => {
-                        hideLoading();
-                        showToast("✅ บันทึกและแชร์สำเร็จ!");
-                        resetForm();
-                        showPage("page-form");
-                    })
-                    .catch(err => {
-                        hideLoading();
-                        console.error("Share error:", err);
-                        Swal.fire({
-                            icon: "error",
-                            title: "แชร์ไม่สำเร็จ",
-                            html: `แต่ข้อมูลบันทึกเรียบร้อยแล้ว<br><small>${err.message || err}</small>`,
-                            confirmButtonText: "ตกลง",
-                            background: "#1e293b",
-                            color: "#fff",
-                        }).then(() => {
-                            resetForm();
-                            showPage("page-form");
-                        });
-                    });
-
-            } else {
-                Swal.fire({
-                    icon: "error",
-                    title: "บันทึกไม่สำเร็จ",
-                    text: res.message || "กรุณาลองใหม่",
-                    background: "#1e293b",
-                    color: "#fff",
-                });
-            }
-        },
-        error: () => {
-            hideLoading();
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+        // เช็คก่อนว่า API นี้ใช้ได้ใน environment ปัจจุบันหรือไม่
+        if (!liff.isInClient() || !liff.isApiAvailable("shareTargetPicker")) {
             Swal.fire({
-                icon: "error",
-                title: "ไม่สามารถเชื่อมต่อได้",
-                text: "กรุณาตรวจสอบอินเทอร์เน็ต",
+                icon: "warning",
+                title: "ไม่สามารถแชร์ได้ที่นี่",
+                html: "ฟีเจอร์แชร์ใช้ได้เฉพาะใน LINE แอปเท่านั้น<br>ข้อมูลบันทึกเรียบร้อยแล้ว",
+                confirmButtonText: "ตกลง",
+                confirmButtonColor: "#22c55e",
                 background: "#1e293b",
                 color: "#fff",
+            }).then(() => {
+                resetForm();
+                showPage("page-form");
             });
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+            return;
         }
+
+        // แชร์ทันที (อยู่ใน .then() แต่ยังถือเป็นส่วนต่อเนื่องของ user click เพราะ fetch เป็น async แต่ promise chain ยังไม่ขาด)
+        // หากยัง error → ลองย้าย fetch ไปใช้ $.ajax + async: false (blocking) ชั่วคราว
+        showLoading("กำลังเปิดตัวเลือกแชร์...");
+        liff.shareTargetPicker([flexMessage], { isMultiple: true })
+            .then(() => {
+                hideLoading();
+                showToast("✅ บันทึกและแชร์สำเร็จแล้ว!");
+                resetForm();
+                showPage("page-form");
+            })
+            .catch(err => {
+                hideLoading();
+                console.error("shareTargetPicker failed:", err);
+                Swal.fire({
+                    icon: "error",
+                    title: "แชร์ไม่สำเร็จ",
+                    html: `แต่ข้อมูลถูกบันทึกเรียบร้อยแล้ว<br><small>${err.message || err || "ไม่ทราบสาเหตุ"}</small><br>คุณสามารถแชร์ข้อความด้วยตนเองได้`,
+                    confirmButtonText: "ตกลง",
+                    background: "#1e293b",
+                    color: "#fff",
+                }).then(() => {
+                    resetForm();
+                    showPage("page-form");
+                });
+            });
+
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+    })
+    .catch(err => {
+        hideLoading();
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+        Swal.fire({
+            icon: "error",
+            title: "เกิดข้อผิดพลาด",
+            text: err.message || "ไม่สามารถบันทึกได้ กรุณาลองใหม่",
+            background: "#1e293b",
+            color: "#fff",
+        });
     });
 }
+
+
 
         // ==============================
         // BUILD FLEX MESSAGE
