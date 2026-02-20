@@ -480,123 +480,148 @@
       formData.uimg     = token?.picture || "";
     } catch(e) {}
 
-    // ============================================================
-    // แยก 2 path ตาม environment:
-    //
-    //  PATH A — อยู่ใน LINE app (canShare = true)
-    //    → shareTargetPicker() ทันที (synchronous จาก click)
-    //    → .then() → บันทึก Sheet
-    //
-    //  PATH B — เปิดใน browser ภายนอก / คอม (canShare = false)
-    //    → บันทึก Sheet อย่างเดียว (ไม่มี share)
-    //    → แจ้งผลลัพธ์ให้ผู้ใช้ทราบ
-    // ============================================================
-    if (canShare) {
-      // ── PATH A: LINE in-app browser ──
-      const flexMessage = buildFlexMessage(formData, DEFAULT_IMG);
+    btn.disabled = true;
+    btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังเปิดแชร์...`;
 
-      btn.disabled = true;
-      btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังเปิดแชร์...`;
+    // ============================================================
+    // PATH A — อยู่ใน LINE app → shareTargetPicker (Flex Message)
+    //   เรียก synchronous จาก click → LINE SDK ยอมรับ 100%
+    //   บันทึก Sheet ใน .then() หลังผู้ใช้เลือกกลุ่มแล้ว
+    //
+    // PATH B — Browser คอม/มือถือ → บันทึก Sheet ก่อน
+    //   แล้ว navigator.share ข้อความสรุป (ถ้า browser รองรับ)
+    //   หรือ copy ไปยัง clipboard (fallback สุดท้าย)
+    // ============================================================
+    if (liff.isInClient() && liff.isApiAvailable("shareTargetPicker")) {
+      // ── PATH A: LINE in-app browser ──────────────────────────
+      const flexMsg = buildFlexMessage(formData, DEFAULT_IMG);
 
-      // ⭐ เรียก shareTargetPicker ทันที synchronous จาก click → LINE ยอมรับ 100%
-      liff.shareTargetPicker([flexMessage], { isMultiple: true })
+      liff.shareTargetPicker([flexMsg], { isMultiple: true })
         .then((shareRes) => {
-          // ไม่ว่าเลือกกลุ่มหรือกด X → บันทึก Sheet ทุกกรณี
-          btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังบันทึก...`;
-          showLoading("กำลังบันทึกข้อมูลลงระบบ...");
-          isSubmitting = true;
-
-          $.ajax({
-            method: "POST", url: SCRIPT_URL, data: formData, dataType: "json",
-            success: (res) => {
-              hideLoading(); isSubmitting = false;
-              btn.disabled = false;
-              btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
-              if (res.status === "success") {
-                showToast(shareRes ? "✅ แชร์และบันทึกสำเร็จ!" : "✅ บันทึกสำเร็จ! (ไม่ได้แชร์)");
-                resetForm(); showPage("page-form");
-              } else {
-                Swal.fire({ icon:"error", title:"บันทึกไม่สำเร็จ",
-                  text: res.message || "กรุณาลองใหม่",
-                  background:"#1e293b", color:"#fff" });
-              }
-            },
-            error: () => {
-              hideLoading(); isSubmitting = false;
-              btn.disabled = false;
-              btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
-              Swal.fire({ icon:"error", title:"บันทึกไม่สำเร็จ",
-                text:"ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่",
-                background:"#1e293b", color:"#fff" });
-            }
-          });
+          doSaveToSheet(formData, btn, shareRes ? "✅ แชร์และบันทึกสำเร็จ!" : "✅ บันทึกสำเร็จ!");
         })
         .catch((err) => {
           console.error("shareTargetPicker error:", err);
           btn.disabled = false;
-          btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
-          // share ล้มเหลว → fallback บันทึกอย่างเดียว
+          btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
           Swal.fire({
-            icon: "warning", title: "แชร์ไม่สำเร็จ",
-            html: `<p>บันทึกข้อมูลลงระบบให้แทนได้เลยไหม?<br><small style="color:#94a3b8">${err?.message || err}</small></p>`,
-            confirmButtonText: "บันทึกอย่างเดียว",
-            confirmButtonColor: "#3b82f6",
+            icon: "warning", title: "เปิดแชร์ไม่สำเร็จ",
+            html: `<p>ต้องการบันทึกข้อมูลลงระบบโดยไม่แชร์ไหม?<br><small style="color:#94a3b8">${err?.message || err}</small></p>`,
+            confirmButtonText: "บันทึกอย่างเดียว", confirmButtonColor: "#3b82f6",
             showCancelButton: true, cancelButtonText: "ยกเลิก",
             background:"#1e293b", color:"#fff",
-          }).then(r => { if (r.isConfirmed) saveToSheetOnly(formData, btn); });
+          }).then(r => { if (r.isConfirmed) doSaveToSheet(formData, btn, "✅ บันทึกสำเร็จ!"); });
         });
 
     } else {
-      // ── PATH B: External browser (คอม / เปิดนอก LINE) ──
-      // บันทึก Sheet อย่างเดียว ไม่มี shareTargetPicker
-      saveToSheetOnly(formData, btn);
+      // ── PATH B: External browser (คอม / มือถือนอก LINE) ─────
+      // บันทึก Sheet ก่อน → แล้วค่อย share ข้อความสรุปผ่าน Web Share API
+      doSaveToSheet(formData, btn, null, /* doWebShare= */ true);
     }
   });
 
   // ============================================================
-  // บันทึก Sheet อย่างเดียว (สำหรับ external browser หรือ fallback)
+  // doSaveToSheet — บันทึก Sheet แล้วเลือก share ตาม context
+  //   successMsg : ข้อความ toast เมื่อสำเร็จ (null = ใช้ default)
+  //   doWebShare : true = เรียก Web Share API / clipboard หลังบันทึก
   // ============================================================
-  function saveToSheetOnly(formData, btn) {
+  function doSaveToSheet(formData, btn, successMsg, doWebShare) {
     btn.disabled = true;
     btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังบันทึก...`;
     showLoading("กำลังบันทึกข้อมูลลงระบบ...");
     isSubmitting = true;
 
     $.ajax({
-      method:   "POST",
-      url:      SCRIPT_URL,
-      data:     formData,
-      dataType: "json",
+      method: "POST", url: SCRIPT_URL, data: formData, dataType: "json",
       success: (res) => {
-        hideLoading();
-        isSubmitting = false;
+        hideLoading(); isSubmitting = false;
         btn.disabled = false;
-        btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+        btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
 
         if (res.status === "success") {
-          showToast("✅ บันทึกสำเร็จ!");
-          resetForm();
-          showPage("page-form");
+          if (doWebShare) {
+            // บันทึกแล้ว → share ผ่าน Web Share API (browser)
+            webShareOrCopy(formData, successMsg || "✅ บันทึกสำเร็จ!");
+          } else {
+            showToast(successMsg || "✅ บันทึกสำเร็จ!");
+            resetForm(); showPage("page-form");
+          }
         } else {
-          Swal.fire({
-            icon: "error", title: "บันทึกไม่สำเร็จ",
+          Swal.fire({ icon:"error", title:"บันทึกไม่สำเร็จ",
             text: res.message || "กรุณาลองใหม่",
-            background: "#1e293b", color: "#fff",
-          });
+            background:"#1e293b", color:"#fff" });
         }
       },
       error: () => {
-        hideLoading();
-        isSubmitting = false;
+        hideLoading(); isSubmitting = false;
         btn.disabled = false;
-        btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
-        Swal.fire({
-          icon: "error", title: "บันทึกไม่สำเร็จ",
-          text: "ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่",
-          background: "#1e293b", color: "#fff",
-        });
+        btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
+        Swal.fire({ icon:"error", title:"บันทึกไม่สำเร็จ",
+          text:"ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่",
+          background:"#1e293b", color:"#fff" });
       }
     });
+  }
+
+  // ============================================================
+  // webShareOrCopy — แชร์ใน External Browser ด้วย Web Share API
+  //   ถ้า browser ไม่รองรับ navigator.share → copy ข้อความลง clipboard
+  // ============================================================
+  function webShareOrCopy(d, successMsg) {
+    const shareText =
+`📚 แจ้งการสอนแทน
+━━━━━━━━━━━━━━━━━
+👩‍🏫 ผู้ลาสอน    : ${d.nameTeacher}
+👨‍🏫 ผู้สอนแทน  : ${d.nameTeacherSave}
+⏰ คาบที่       : คาบ ${d.numberAtPeriod}
+📖 วิชา         : ${d.subjectSave}
+🏫 ห้องเรียน   : ${d.subjectRoom}
+📅 วันที่       : ${d.thaiDate}
+🕐 เวลา         : ${d.thaiTime}
+━━━━━━━━━━━━━━━━━
+❤️ ระบบบันทึกการสอนแทน | ครูอั๋น ใจดี`;
+
+    if (navigator.share) {
+      // ✅ Web Share API — เปิด native share sheet (Android Chrome / iOS Safari)
+      navigator.share({
+        title: "📚 แจ้งการสอนแทน",
+        text:  shareText,
+      })
+      .then(() => {
+        showToast("✅ แชร์และบันทึกสำเร็จ!");
+        resetForm(); showPage("page-form");
+      })
+      .catch((err) => {
+        // ผู้ใช้กด Cancel หรือ error → ก็ถือว่าบันทึกสำเร็จแล้ว
+        if (err.name !== "AbortError") console.warn("Web Share error:", err);
+        showToast(successMsg || "✅ บันทึกสำเร็จ!");
+        resetForm(); showPage("page-form");
+      });
+
+    } else {
+      // ✅ Fallback — copy ข้อความไปยัง clipboard แล้วแจ้งผู้ใช้
+      navigator.clipboard.writeText(shareText)
+        .then(() => {
+          Swal.fire({
+            icon: "success",
+            title: "✅ บันทึกสำเร็จ!",
+            html: `<p>คัดลอกข้อมูลสอนแทนไปยัง Clipboard แล้ว<br>
+                   <small style="color:#94a3b8">วางในแอปแชทที่ต้องการได้เลย</small></p>`,
+            confirmButtonText: "ตกลง", confirmButtonColor: "#22c55e",
+            background: "#1e293b", color: "#fff",
+          }).then(() => { resetForm(); showPage("page-form"); });
+        })
+        .catch(() => {
+          // clipboard ล้มเหลว → แสดง text ให้ copy เอง
+          Swal.fire({
+            icon: "success",
+            title: "✅ บันทึกสำเร็จ!",
+            html: `<p style="text-align:left;font-size:0.8rem;background:#0f172a;padding:12px;border-radius:8px;white-space:pre-wrap;color:#e2e8f0">${shareText}</p>`,
+            confirmButtonText: "ปิด", confirmButtonColor: "#22c55e",
+            background: "#1e293b", color: "#fff",
+          }).then(() => { resetForm(); showPage("page-form"); });
+        });
+    }
   }
 
   // ============================================================
@@ -661,45 +686,44 @@
   }
 
   // ============================================================
-  // UPDATE LIFF STATUS BADGE (แสดงสถานะบนหน้าเพจ)
+  // updateEnvBadge — อัพเดท badge + hint + ปุ่มตาม environment
   // ============================================================
-  function updateLiffStatus(inClient, loggedIn, errMsg) {
-    const badge = document.getElementById("liffStatusBadge");
+  function updateEnvBadge(inClient, errMsg) {
+    const badge     = document.getElementById("liffStatusBadge");
+    const hint      = document.getElementById("confirmHint");
+    const submitBtn = document.getElementById("submitBtn");
     if (!badge) return;
 
+    const hasLineShare    = inClient && !errMsg && liff.isApiAvailable("shareTargetPicker");
+    const hasWebShare     = !!navigator.share;
+    const hasClipboard    = !!navigator.clipboard;
+
     if (errMsg) {
-      badge.className = "liff-badge liff-badge-error";
-      badge.innerHTML = `<i class="bi bi-exclamation-triangle-fill mr-1"></i>LIFF Error`;
-      badge.title = errMsg;
-    } else if (!loggedIn) {
       badge.className = "liff-badge liff-badge-warn";
-      badge.innerHTML = `<i class="bi bi-person-x-fill mr-1"></i>กำลัง Login...`;
-    } else if (inClient) {
+      badge.innerHTML = `<i class="bi bi-exclamation-triangle-fill mr-1"></i>LIFF Error — ${hasWebShare ? "ใช้ Web Share แทน" : "ใช้ Clipboard แทน"}`;
+    } else if (hasLineShare) {
       badge.className = "liff-badge liff-badge-ok";
-      badge.innerHTML = `<i class="bi bi-phone-fill mr-1"></i>LINE App ✓ แชร์ได้`;
+      badge.innerHTML = `<i class="bi bi-phone-fill mr-1"></i>LINE App — แชร์ Flex Message ✓`;
+    } else if (hasWebShare) {
+      badge.className = "liff-badge liff-badge-info";
+      badge.innerHTML = `<i class="bi bi-share-fill mr-1"></i>Browser — แชร์ด้วย Web Share ✓`;
     } else {
       badge.className = "liff-badge liff-badge-info";
-      badge.innerHTML = `<i class="bi bi-globe mr-1"></i>Browser — บันทึกได้, แชร์ไม่ได้`;
+      badge.innerHTML = `<i class="bi bi-clipboard-fill mr-1"></i>Browser — คัดลอกข้อความ ✓`;
     }
     badge.classList.remove("hidden");
 
-    // อัพเดทปุ่ม submit ให้แสดงตาม context
-    const submitBtn = document.getElementById("submitBtn");
-    if (submitBtn) {
-      if (inClient && loggedIn && !errMsg) {
-        submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์ LINE`;
-      } else {
-        submitBtn.innerHTML = `<i class="bi bi-floppy-fill"></i> ยืนยันและบันทึก`;
-      }
+    if (submitBtn && !submitBtn.disabled) {
+      submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์`;
     }
 
-    // อัพเดท hint ใน confirm page
-    const hint = document.getElementById("confirmHint");
     if (hint) {
-      if (inClient && loggedIn && !errMsg) {
-        hint.innerHTML = `<i class="bi bi-info-circle mr-1"></i>กดยืนยัน → <strong class="text-green-400">เปิดแชร์ LINE ทันที</strong> → บันทึกข้อมูล`;
+      if (hasLineShare) {
+        hint.innerHTML = `<i class="bi bi-info-circle mr-1"></i>กดยืนยัน → <strong class="text-green-400">เปิดแชร์ LINE ทันที</strong> → บันทึก`;
+      } else if (hasWebShare) {
+        hint.innerHTML = `<i class="bi bi-info-circle mr-1"></i>กดยืนยัน → <strong class="text-blue-400">บันทึก</strong> → <strong class="text-green-400">เปิด Share Sheet</strong>`;
       } else {
-        hint.innerHTML = `<i class="bi bi-info-circle mr-1"></i>กดยืนยัน → <strong class="text-blue-400">บันทึกข้อมูลลงระบบ</strong> (เปิดใน LINE เพื่อแชร์)`;
+        hint.innerHTML = `<i class="bi bi-info-circle mr-1"></i>กดยืนยัน → <strong class="text-blue-400">บันทึก</strong> → <strong class="text-yellow-400">คัดลอกข้อความ</strong>`;
       }
     }
   }
@@ -717,47 +741,25 @@
   }
 
   // ============================================================
-  // LIFF INIT — รองรับทั้ง LINE browser (มือถือ) และ External browser (คอม)
-  //
-  //  ┌─────────────────────────────────────────────────────────┐
-  //  │  Environment          │ withLoginOnExternalBrowser       │
-  //  │  LINE in-app browser  │ login อัตโนมัติภายใน LINE       │
-  //  │  External browser     │ redirect ไป LINE Login แล้วกลับ  │
-  //  └─────────────────────────────────────────────────────────┘
-  //
-  //  liff.isInClient()  = true  → อยู่ใน LINE app (มือถือ)
-  //  liff.isInClient()  = false → เปิดใน browser ภายนอก (คอม/Safari)
-  //  liff.isLoggedIn()  = true  → มี access token แล้ว (ใช้งานได้)
+  // LIFF INIT
   // ============================================================
   document.getElementById("year").textContent = new Date().getFullYear();
 
-  // ตัวแปรบอกว่า share ได้หรือไม่ (ต้องอยู่ใน LINE + shareTargetPicker available)
-  let canShare = false;
-
   liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true })
     .then(() => {
-      const inClient  = liff.isInClient();   // true = อยู่ใน LINE app
-      const loggedIn  = liff.isLoggedIn();
-
+      const inClient = liff.isInClient();
+      const loggedIn = liff.isLoggedIn();
       console.log("LIFF ready | inClient:", inClient, "| loggedIn:", loggedIn);
 
-      // ถ้ายังไม่ login → redirect ไป LINE Login (ใช้ได้ทั้งมือถือและคอม)
       if (!loggedIn) {
         liff.login({ redirectUri: window.location.href });
         return;
       }
-
-      // ตรวจสอบว่า shareTargetPicker ใช้ได้หรือไม่
-      canShare = inClient && liff.isApiAvailable("shareTargetPicker");
-
-      // แสดง badge สถานะ LIFF
-      updateLiffStatus(inClient, loggedIn);
+      updateEnvBadge(inClient);
     })
     .catch(err => {
       console.warn("LIFF init error:", err);
-      // ถ้า init ล้มเหลว → ยังใช้ form บันทึกได้ แต่ share ไม่ได้
-      canShare = false;
-      updateLiffStatus(false, false, err.message);
+      updateEnvBadge(false, err.message);
     });
   </script>
 </body>
