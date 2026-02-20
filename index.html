@@ -108,12 +108,23 @@
             font-size:1rem; display:flex; align-items:center; justify-content:center;
         }
 
-        /* หน้าสำเร็จ */
         .success-icon { font-size:4rem; animation:popIn 0.5s cubic-bezier(0.175,0.885,0.32,1.275); }
         @keyframes popIn {
             from { transform:scale(0); opacity:0; }
             to   { transform:scale(1); opacity:1; }
         }
+
+        /* Banner แจ้งเตือนเปิดใน LINE */
+        #liff-redirect-banner {
+            display:none;
+            position:fixed; inset:0; z-index:10000;
+            background:rgba(0,0,0,0.92);
+            align-items:center; justify-content:center;
+            flex-direction:column; gap:20px;
+            padding:24px;
+        }
+        #liff-redirect-banner.show { display:flex; }
+        .line-logo { font-size:4rem; }
     </style>
 </head>
 
@@ -127,6 +138,25 @@
 
     <!-- TOAST -->
     <div id="toast"></div>
+
+    <!-- ===== LIFF REDIRECT BANNER (เปิดใน browser ธรรมดา) ===== -->
+    <div id="liff-redirect-banner">
+        <div class="line-logo">💬</div>
+        <div class="glass-card rounded-2xl p-6 text-center max-w-sm w-full">
+            <h2 class="text-xl font-bold text-green-400 glow-green mb-2">เปิดใน LINE</h2>
+            <p class="text-slate-300 text-sm mb-1">ระบบนี้ต้องใช้งานผ่าน <strong>LINE App</strong></p>
+            <p class="text-slate-400 text-xs mb-5">เพื่อให้ฟีเจอร์แชร์และล็อกอินทำงานได้อย่างถูกต้อง</p>
+            <a id="openInLineBtn" href="#"
+                class="btn-line block w-full text-white font-semibold py-3 rounded-xl text-center mb-3">
+                <i class="bi bi-box-arrow-up-right mr-1"></i> เปิดใน LINE App
+            </a>
+            <button id="continueAnywayBtn"
+                class="btn-gray w-full text-white font-semibold py-3 rounded-xl text-sm">
+                ใช้งานต่อในเบราว์เซอร์นี้ (บางฟีเจอร์อาจไม่ทำงาน)
+            </button>
+        </div>
+        <p class="text-slate-500 text-xs mt-2">หากมีปัญหา กด "ใช้งานต่อ" ด้านบน</p>
+    </div>
 
     <!-- HEADER -->
     <div class="text-center mb-6 mt-2">
@@ -298,6 +328,7 @@
         // ============================================================
         const SCRIPT_URL   = "https://script.google.com/macros/s/AKfycbw8FMpndZve9-cBaR76IBFDxHSFpZtNt_k5WyJ-mPtTO5GHaTf64dlz79kkwTufpDhP/exec";
         const LIFF_ID      = "2000563749-Yh67UIqr";
+        const LIFF_URL     = `https://liff.line.me/${LIFF_ID}`;
         const FALLBACK_IMG = "https://lh3.googleusercontent.com/d/1hTcB5YnvnJtMg0l4fIO5Jo20QbKF5_wh";
 
         // ============================================================
@@ -337,6 +368,46 @@
             document.getElementById("imgPreviewWrapper").classList.add("hidden");
             document.getElementById("uploadPlaceholder").classList.remove("hidden");
         }
+
+        // ============================================================
+        // CLIENT CHECK — เช็คก่อนว่าอยู่ใน LINE App หรือเปล่า
+        // ============================================================
+
+        /**
+         * ตรวจสอบว่า User Agent เป็น LINE App จริงๆ ไหม
+         * LINE App จะมี "Line/" หรือ "LIFF" ใน UA
+         */
+        function isLineInternalBrowser() {
+            const ua = navigator.userAgent || "";
+            return /Line\//i.test(ua) || /LIFF/i.test(ua);
+        }
+
+        /**
+         * สร้าง URL สำหรับเปิด LINE App
+         * - iOS: line://app/<liffPath>
+         * - Android + fallback: https://liff.line.me/<LIFF_ID>
+         */
+        function buildOpenInLineUrl() {
+            const currentPath = window.location.pathname + window.location.search + window.location.hash;
+            return LIFF_URL;
+        }
+
+        /**
+         * แสดง Banner แนะนำให้เปิดใน LINE
+         * พร้อมปุ่ม "เปิดใน LINE App" และ "ใช้งานต่อในเบราว์เซอร์"
+         */
+        function showRedirectBanner() {
+            const banner = document.getElementById("liff-redirect-banner");
+            const openBtn = document.getElementById("openInLineBtn");
+            openBtn.href = buildOpenInLineUrl();
+            banner.classList.add("show");
+        }
+
+        document.getElementById("continueAnywayBtn").addEventListener("click", () => {
+            document.getElementById("liff-redirect-banner").classList.remove("show");
+            // ยังคง init LIFF ต่อแม้จะอยู่นอก LINE (เพื่อ fallback)
+            initLiff();
+        });
 
         // ============================================================
         // IMAGE UPLOAD
@@ -424,6 +495,8 @@
                 thaiTime:        getThaiTime(),
                 imageBase64:     uploadedImageBase64 || "",
             };
+
+            // ดึงข้อมูล LIFF user ถ้ามี
             try {
                 const tk = liff.getDecodedIDToken();
                 data.uid = tk?.sub||""; data.uname = tk?.name||""; data.uimg = tk?.picture||"";
@@ -448,17 +521,29 @@
                     const flexMsg = buildFlexMessage(data, imgUrl);
                     resetForm();
 
-                    // เรียก shareTargetPicker ทันทีเลย ไม่มี popup คั่น
-                    liff.shareTargetPicker([flexMsg], { isMultiple: true })
-                        .then(() => {
-                            showToast("✅ แชร์สำเร็จ!");
+                    // เช็คก่อนว่า shareTargetPicker ใช้งานได้ไหม (ต้องอยู่ใน LINE)
+                    if (liff.isApiAvailable("shareTargetPicker")) {
+                        liff.shareTargetPicker([flexMsg], { isMultiple: true })
+                            .then(() => {
+                                showToast("✅ แชร์สำเร็จ!");
+                                showPage("page-form");
+                            })
+                            .catch(err => {
+                                console.error("shareTargetPicker error:", err);
+                                showToast("⚠️ " + (err?.message || err?.code || "แชร์ไม่สำเร็จ"));
+                                showPage("page-form");
+                            });
+                    } else {
+                        // ไม่ได้อยู่ใน LINE App — แจ้งและ redirect ไป LIFF URL
+                        showToast("✅ บันทึกแล้ว! กรุณาเปิดใน LINE เพื่อแชร์");
+                        setTimeout(() => {
                             showPage("page-form");
-                        })
-                        .catch(err => {
-                            console.error("shareTargetPicker error:", err);
-                            showToast("⚠️ " + (err?.message || err?.code || "แชร์ไม่สำเร็จ"));
-                            showPage("page-form");
-                        });
+                            // เสนอให้เปิดลิ้งค์ใน LINE
+                            if (confirm("บันทึกข้อมูลสำเร็จแล้ว!\nต้องการเปิดใน LINE App เพื่อแชร์ผลลัพธ์ไหม?")) {
+                                window.location.href = buildOpenInLineUrl();
+                            }
+                        }, 1500);
+                    }
                 } else {
                     showToast("❌ บันทึกไม่สำเร็จ: " + (json.message || "กรุณาลองใหม่"));
                 }
@@ -471,40 +556,6 @@
                 console.error("fetch error:", err);
             }
         }
-
-        // ============================================================
-        // PAGE 3 — ปุ่มแชร์ (user กดโดยตรง = user gesture ถูกต้อง 100%)
-        // shareTargetPicker รองรับทั้ง LINE App และ browser บน PC/มือถือ
-        // ============================================================
-        document.getElementById("shareBtn").addEventListener("click", () => {
-            if (!_pendingFlex) { showToast("ไม่มีข้อมูลที่จะแชร์"); return; }
-
-            const shareBtn = document.getElementById("shareBtn");
-            shareBtn.disabled = true;
-            shareBtn.innerHTML = `<span class="inline-block w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังเปิด...`;
-
-            // shareTargetPicker ใช้ได้ทั้งมือถือ LINE App และ mobile browser
-            // ไม่ต้องเช็ค isInClient() หรือ isApiAvailable() ก่อน — เรียกตรงได้เลย
-            liff.shareTargetPicker([_pendingFlex], { isMultiple: true })
-                .then(() => {
-                    shareBtn.disabled = false;
-                    shareBtn.innerHTML = `<i class="bi bi-share-fill"></i> แชร์ Flex Message`;
-                    _pendingFlex = null;
-                    showToast("✅ แชร์สำเร็จ!");
-                    showPage("page-form");
-                })
-                .catch(err => {
-                    shareBtn.disabled = false;
-                    shareBtn.innerHTML = `<i class="bi bi-share-fill"></i> แชร์ Flex Message`;
-                    console.error("shareTargetPicker error:", err);
-                    showToast("⚠️ " + (err?.message || err?.code || "แชร์ไม่สำเร็จ"));
-                });
-        });
-
-        document.getElementById("skipShareBtn").addEventListener("click", () => {
-            _pendingFlex = null;
-            showPage("page-form");
-        });
 
         // ============================================================
         // BUILD FLEX MESSAGE
@@ -576,9 +627,32 @@
         // ============================================================
         document.getElementById("year").textContent = new Date().getFullYear();
 
-        liff.init({ liffId: LIFF_ID })
-            .then(() => { if (!liff.isLoggedIn()) liff.login(); })
-            .catch(err => console.warn("LIFF init error:", err));
+        function initLiff() {
+            liff.init({ liffId: LIFF_ID })
+                .then(() => {
+                    if (!liff.isLoggedIn()) {
+                        liff.login();
+                    }
+                })
+                .catch(err => console.warn("LIFF init error:", err));
+        }
+
+        /**
+         * Entry point: เช็ค client ก่อน
+         * ถ้าไม่ได้อยู่ใน LINE App → แสดง banner แนะนำ
+         * ถ้าอยู่ใน LINE App → init LIFF ปกติ
+         */
+        (function checkClientAndInit() {
+            if (isLineInternalBrowser()) {
+                // อยู่ใน LINE App แล้ว → init LIFF ตามปกติ
+                initLiff();
+            } else {
+                // เปิดใน browser ธรรมดา → แสดง banner ก่อน
+                showRedirectBanner();
+                // ยัง init LIFF ไว้เบื้องหลังเพื่อ fallback (ไม่บังคับ login ทันที)
+                liff.init({ liffId: LIFF_ID }).catch(err => console.warn("LIFF bg init error:", err));
+            }
+        })();
     </script>
 </body>
 </html>
