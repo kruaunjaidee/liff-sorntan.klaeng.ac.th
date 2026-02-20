@@ -105,6 +105,18 @@
       width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
       font-size: 1rem; display: flex; align-items: center; justify-content: center;
     }
+
+    /* LIFF Status Badge */
+    .liff-badge {
+      display: inline-flex; align-items: center;
+      font-size: 0.7rem; padding: 3px 10px; border-radius: 9999px;
+      font-weight: 600; letter-spacing: 0.02em;
+      border: 1px solid; transition: all 0.3s;
+    }
+    .liff-badge-ok    { background: rgba(34,197,94,0.15);  color: #4ade80; border-color: rgba(34,197,94,0.4); }
+    .liff-badge-info  { background: rgba(59,130,246,0.15); color: #93c5fd; border-color: rgba(59,130,246,0.4); }
+    .liff-badge-warn  { background: rgba(234,179,8,0.15);  color: #fde047; border-color: rgba(234,179,8,0.4); }
+    .liff-badge-error { background: rgba(239,68,68,0.15);  color: #fca5a5; border-color: rgba(239,68,68,0.4); }
   </style>
 </head>
 
@@ -125,6 +137,12 @@
     <h3 class="text-2xl sm:text-3xl font-bold glow-green tracking-wide">ระบบบันทึกการสอนแทน</h3>
     <p class="text-sm text-slate-400 mt-1">ครูขาด • ลา • ไปราชการ</p>
     <h5 class="text-base text-pink-400 glow-pink mt-1">ครูอั๋น ใจดี</h5>
+    <!-- LIFF Status Badge — อัพเดทอัตโนมัติหลัง liff.init() -->
+    <div class="mt-2 flex justify-center">
+      <span id="liffStatusBadge" class="liff-badge liff-badge-warn hidden">
+        <i class="bi bi-arrow-repeat mr-1"></i>กำลังเชื่อมต่อ LINE...
+      </span>
+    </div>
   </div>
 
   <!-- PAGE 1: FORM -->
@@ -264,7 +282,7 @@
         <div class="confirm-row"><span class="confirm-label">🕐 เวลา</span><span class="confirm-value" id="c-time">—</span></div>
       </div>
 
-      <p class="text-sm text-slate-400 text-center mb-5">
+      <p id="confirmHint" class="text-sm text-slate-400 text-center mb-5">
         <i class="bi bi-info-circle mr-1"></i>
         กดยืนยัน → <strong class="text-green-400">เปิดแชร์ LINE ทันที</strong> → บันทึกข้อมูล
       </p>
@@ -440,7 +458,9 @@
   document.getElementById("submitBtn").addEventListener("click", function () {
     if (isSubmitting) return;
 
-    // เก็บข้อมูล form ณ ตอนกด
+    const btn = this;
+
+    // รวบรวมข้อมูล form
     const formData = {
       opt:             "savedata",
       nameTeacher:     document.getElementById("nameTeacher").value,
@@ -460,104 +480,81 @@
       formData.uimg     = token?.picture || "";
     } catch(e) {}
 
-    // ใช้ DEFAULT_IMG เพราะตอนนี้ยังไม่ได้ upload รูปขึ้น Drive
-    // (รูปจริงจาก Drive จะได้หลัง ajax — แต่ share ต้องมาก่อน)
-    const flexImgUrl = uploadedImageBase64
-      ? ("data" in document.getElementById("imgPreview"))   // ใช้ data URI ไม่ได้ใน Flex
-        ? DEFAULT_IMG
-        : DEFAULT_IMG   // Flex ต้องการ https URL เท่านั้น → ใช้ default ก่อน
-      : DEFAULT_IMG;
+    // ============================================================
+    // แยก 2 path ตาม environment:
+    //
+    //  PATH A — อยู่ใน LINE app (canShare = true)
+    //    → shareTargetPicker() ทันที (synchronous จาก click)
+    //    → .then() → บันทึก Sheet
+    //
+    //  PATH B — เปิดใน browser ภายนอก / คอม (canShare = false)
+    //    → บันทึก Sheet อย่างเดียว (ไม่มี share)
+    //    → แจ้งผลลัพธ์ให้ผู้ใช้ทราบ
+    // ============================================================
+    if (canShare) {
+      // ── PATH A: LINE in-app browser ──
+      const flexMessage = buildFlexMessage(formData, DEFAULT_IMG);
 
-    // สร้าง Flex message ด้วย default image (รูปที่ upload จะบันทึกลง Sheet แต่ใน Flex ใช้ default)
-    const flexMessage = buildFlexMessage(formData, DEFAULT_IMG);
+      btn.disabled = true;
+      btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังเปิดแชร์...`;
 
-    const btn = this;
-    btn.disabled = true;
-    btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังเปิดแชร์...`;
+      // ⭐ เรียก shareTargetPicker ทันที synchronous จาก click → LINE ยอมรับ 100%
+      liff.shareTargetPicker([flexMessage], { isMultiple: true })
+        .then((shareRes) => {
+          // ไม่ว่าเลือกกลุ่มหรือกด X → บันทึก Sheet ทุกกรณี
+          btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังบันทึก...`;
+          showLoading("กำลังบันทึกข้อมูลลงระบบ...");
+          isSubmitting = true;
 
-    // ⭐ เรียก shareTargetPicker ทันที — synchronous จาก click handler
-    liff.shareTargetPicker([flexMessage], { isMultiple: true })
-      .then((shareRes) => {
-        // ผู้ใช้เลือกกลุ่มแล้ว (หรือกด X ปิด picker — shareRes จะเป็น null/undefined)
-        // ไม่ว่าจะเลือกหรือยกเลิก → บันทึก Sheet ทุกกรณี
-        btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังบันทึก...`;
-        showLoading("กำลังบันทึกข้อมูลลงระบบ...");
-        isSubmitting = true;
-
-        $.ajax({
-          method:   "POST",
-          url:      SCRIPT_URL,
-          data:     formData,
-          dataType: "json",
-          success: (res) => {
-            hideLoading();
-            isSubmitting = false;
-            btn.disabled = false;
-            btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
-
-            if (res.status === "success") {
-              const shared = shareRes ? "✅ แชร์และบันทึกสำเร็จ!" : "✅ บันทึกสำเร็จ! (ไม่ได้แชร์)";
-              showToast(shared);
-              resetForm();
-              showPage("page-form");
-            } else {
-              Swal.fire({
-                icon: "error", title: "บันทึกไม่สำเร็จ",
-                text: res.message || "กรุณาลองใหม่",
-                background: "#1e293b", color: "#fff",
-              });
+          $.ajax({
+            method: "POST", url: SCRIPT_URL, data: formData, dataType: "json",
+            success: (res) => {
+              hideLoading(); isSubmitting = false;
+              btn.disabled = false;
+              btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+              if (res.status === "success") {
+                showToast(shareRes ? "✅ แชร์และบันทึกสำเร็จ!" : "✅ บันทึกสำเร็จ! (ไม่ได้แชร์)");
+                resetForm(); showPage("page-form");
+              } else {
+                Swal.fire({ icon:"error", title:"บันทึกไม่สำเร็จ",
+                  text: res.message || "กรุณาลองใหม่",
+                  background:"#1e293b", color:"#fff" });
+              }
+            },
+            error: () => {
+              hideLoading(); isSubmitting = false;
+              btn.disabled = false;
+              btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+              Swal.fire({ icon:"error", title:"บันทึกไม่สำเร็จ",
+                text:"ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่",
+                background:"#1e293b", color:"#fff" });
             }
-          },
-          error: () => {
-            hideLoading();
-            isSubmitting = false;
-            btn.disabled = false;
-            btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
-            Swal.fire({
-              icon: "error", title: "บันทึกไม่สำเร็จ",
-              text: "ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่",
-              background: "#1e293b", color: "#fff",
-            });
-          }
-        });
-      })
-      .catch((err) => {
-        // shareTargetPicker เกิด error (เช่น ไม่ได้อยู่ใน LINE, หรือ LIFF ยังไม่ init)
-        console.error("shareTargetPicker error:", err);
-        btn.disabled = false;
-        btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
-
-        const errMsg = err?.message || String(err);
-        const isNotInLine = errMsg.includes("not in LINE") || errMsg.includes("shareTargetPicker is not");
-
-        if (isNotInLine) {
-          // ถ้าไม่ได้อยู่ใน LINE browser → บันทึกอย่างเดียว
+          });
+        })
+        .catch((err) => {
+          console.error("shareTargetPicker error:", err);
+          btn.disabled = false;
+          btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+          // share ล้มเหลว → fallback บันทึกอย่างเดียว
           Swal.fire({
-            icon: "warning",
-            title: "ไม่สามารถแชร์ได้",
-            html: `<p>กรุณาเปิดผ่าน <strong>LINE</strong> เพื่อใช้ฟีเจอร์แชร์<br><small style="color:#94a3b8">จะบันทึกข้อมูลลงระบบให้อัตโนมัติ</small></p>`,
+            icon: "warning", title: "แชร์ไม่สำเร็จ",
+            html: `<p>บันทึกข้อมูลลงระบบให้แทนได้เลยไหม?<br><small style="color:#94a3b8">${err?.message || err}</small></p>`,
             confirmButtonText: "บันทึกอย่างเดียว",
             confirmButtonColor: "#3b82f6",
-            background: "#1e293b", color: "#fff",
-          }).then(() => saveToSheetOnly(formData, btn));
-        } else {
-          // error อื่น → แจ้งและให้เลือกบันทึกอย่างเดียว
-          Swal.fire({
-            icon: "error",
-            title: "แชร์ไม่สำเร็จ",
-            html: `<p style="color:#94a3b8;font-size:0.8rem">${errMsg}</p>`,
-            confirmButtonText: "บันทึกอย่างเดียว",
-            confirmButtonColor: "#3b82f6",
-            showCancelButton: true,
-            cancelButtonText: "ยกเลิก",
-            background: "#1e293b", color: "#fff",
+            showCancelButton: true, cancelButtonText: "ยกเลิก",
+            background:"#1e293b", color:"#fff",
           }).then(r => { if (r.isConfirmed) saveToSheetOnly(formData, btn); });
-        }
-      });
+        });
+
+    } else {
+      // ── PATH B: External browser (คอม / เปิดนอก LINE) ──
+      // บันทึก Sheet อย่างเดียว ไม่มี shareTargetPicker
+      saveToSheetOnly(formData, btn);
+    }
   });
 
   // ============================================================
-  // บันทึก Sheet อย่างเดียว (fallback เมื่อ share ไม่ได้)
+  // บันทึก Sheet อย่างเดียว (สำหรับ external browser หรือ fallback)
   // ============================================================
   function saveToSheetOnly(formData, btn) {
     btn.disabled = true;
@@ -664,6 +661,50 @@
   }
 
   // ============================================================
+  // UPDATE LIFF STATUS BADGE (แสดงสถานะบนหน้าเพจ)
+  // ============================================================
+  function updateLiffStatus(inClient, loggedIn, errMsg) {
+    const badge = document.getElementById("liffStatusBadge");
+    if (!badge) return;
+
+    if (errMsg) {
+      badge.className = "liff-badge liff-badge-error";
+      badge.innerHTML = `<i class="bi bi-exclamation-triangle-fill mr-1"></i>LIFF Error`;
+      badge.title = errMsg;
+    } else if (!loggedIn) {
+      badge.className = "liff-badge liff-badge-warn";
+      badge.innerHTML = `<i class="bi bi-person-x-fill mr-1"></i>กำลัง Login...`;
+    } else if (inClient) {
+      badge.className = "liff-badge liff-badge-ok";
+      badge.innerHTML = `<i class="bi bi-phone-fill mr-1"></i>LINE App ✓ แชร์ได้`;
+    } else {
+      badge.className = "liff-badge liff-badge-info";
+      badge.innerHTML = `<i class="bi bi-globe mr-1"></i>Browser — บันทึกได้, แชร์ไม่ได้`;
+    }
+    badge.classList.remove("hidden");
+
+    // อัพเดทปุ่ม submit ให้แสดงตาม context
+    const submitBtn = document.getElementById("submitBtn");
+    if (submitBtn) {
+      if (inClient && loggedIn && !errMsg) {
+        submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยัน + แชร์ LINE`;
+      } else {
+        submitBtn.innerHTML = `<i class="bi bi-floppy-fill"></i> ยืนยันและบันทึก`;
+      }
+    }
+
+    // อัพเดท hint ใน confirm page
+    const hint = document.getElementById("confirmHint");
+    if (hint) {
+      if (inClient && loggedIn && !errMsg) {
+        hint.innerHTML = `<i class="bi bi-info-circle mr-1"></i>กดยืนยัน → <strong class="text-green-400">เปิดแชร์ LINE ทันที</strong> → บันทึกข้อมูล`;
+      } else {
+        hint.innerHTML = `<i class="bi bi-info-circle mr-1"></i>กดยืนยัน → <strong class="text-blue-400">บันทึกข้อมูลลงระบบ</strong> (เปิดใน LINE เพื่อแชร์)`;
+      }
+    }
+  }
+
+  // ============================================================
   // RESET FORM
   // ============================================================
   function resetForm() {
@@ -676,21 +717,47 @@
   }
 
   // ============================================================
-  // LIFF INIT
+  // LIFF INIT — รองรับทั้ง LINE browser (มือถือ) และ External browser (คอม)
+  //
+  //  ┌─────────────────────────────────────────────────────────┐
+  //  │  Environment          │ withLoginOnExternalBrowser       │
+  //  │  LINE in-app browser  │ login อัตโนมัติภายใน LINE       │
+  //  │  External browser     │ redirect ไป LINE Login แล้วกลับ  │
+  //  └─────────────────────────────────────────────────────────┘
+  //
+  //  liff.isInClient()  = true  → อยู่ใน LINE app (มือถือ)
+  //  liff.isInClient()  = false → เปิดใน browser ภายนอก (คอม/Safari)
+  //  liff.isLoggedIn()  = true  → มี access token แล้ว (ใช้งานได้)
   // ============================================================
   document.getElementById("year").textContent = new Date().getFullYear();
 
+  // ตัวแปรบอกว่า share ได้หรือไม่ (ต้องอยู่ใน LINE + shareTargetPicker available)
+  let canShare = false;
+
   liff.init({ liffId: LIFF_ID, withLoginOnExternalBrowser: true })
     .then(() => {
-      if (!liff.isLoggedIn()) liff.login();
+      const inClient  = liff.isInClient();   // true = อยู่ใน LINE app
+      const loggedIn  = liff.isLoggedIn();
+
+      console.log("LIFF ready | inClient:", inClient, "| loggedIn:", loggedIn);
+
+      // ถ้ายังไม่ login → redirect ไป LINE Login (ใช้ได้ทั้งมือถือและคอม)
+      if (!loggedIn) {
+        liff.login({ redirectUri: window.location.href });
+        return;
+      }
+
+      // ตรวจสอบว่า shareTargetPicker ใช้ได้หรือไม่
+      canShare = inClient && liff.isApiAvailable("shareTargetPicker");
+
+      // แสดง badge สถานะ LIFF
+      updateLiffStatus(inClient, loggedIn);
     })
     .catch(err => {
       console.warn("LIFF init error:", err);
-      Swal.fire({
-        icon: "error", title: "ไม่สามารถเชื่อมต่อ LINE LIFF",
-        text: "กรุณาเปิดผ่าน LINE หรือตรวจสอบการเชื่อมต่อ",
-        background: "#1e293b", color: "#fff",
-      });
+      // ถ้า init ล้มเหลว → ยังใช้ form บันทึกได้ แต่ share ไม่ได้
+      canShare = false;
+      updateLiffStatus(false, false, err.message);
     });
   </script>
 </body>
