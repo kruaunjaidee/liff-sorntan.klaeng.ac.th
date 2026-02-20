@@ -534,33 +534,65 @@
       formData.uimg  = token?.picture || "";
     } catch(e) {}
 
-    const flexMsg = buildFlexMessage(formData, DEFAULT_IMG);
-
     // อยู่ใน LINE in-app browser แน่นอน (ผ่าน checkAndRedirect แล้ว)
     btn.disabled = true;
-    btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังเปิดแชร์ LINE...`;
+    btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังบันทึกและเตรียมแชร์...`;
+    showLoading("กำลังบันทึกข้อมูล...");
+    isSubmitting = true;
 
-    liff.shareTargetPicker([flexMsg], { isMultiple: true })
-      .then((res) => {
-        doSaveToSheet(formData, btn,
-          res ? "✅ แชร์และบันทึกสำเร็จ!" : "✅ บันทึกสำเร็จ! (ไม่ได้แชร์)");
-      })
-      .catch((err) => {
-        console.error("[Mobile] shareTargetPicker error:", err);
+    // บันทึก Sheet ก่อน เพื่อเอา Drive URL ของรูปที่ Apps Script อัพโหลดไว้
+    $.ajax({
+      method: "POST", url: SCRIPT_URL, data: formData, dataType: "json",
+      success: (res) => {
+        hideLoading();
+        isSubmitting = false;
+
+        if (res.status !== "success") {
+          btn.disabled = false;
+          btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+          Swal.fire({ icon:"error", title:"บันทึกไม่สำเร็จ",
+            text: res.message || "กรุณาลองใหม่",
+            background:"#1e293b", color:"#fff" });
+          return;
+        }
+
+        // ใช้ Drive URL ที่ Apps Script ส่งกลับมา (ถ้ามี) หรือ default
+        const finalImgUrl = res.imageUrl || DEFAULT_IMG;
+        const flexMsg = buildFlexMessage(formData, finalImgUrl);
+
+        btn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังเปิดแชร์ LINE...`;
+
+        liff.shareTargetPicker([flexMsg], { isMultiple: true })
+          .then((shareRes) => {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+            showToast(shareRes ? "✅ แชร์และบันทึกสำเร็จ!" : "✅ บันทึกสำเร็จ! (ไม่ได้แชร์)");
+            resetForm(); showPage("page-form");
+          })
+          .catch((err) => {
+            console.error("[Mobile] shareTargetPicker error:", err);
+            btn.disabled = false;
+            btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+            // บันทึกสำเร็จแล้ว แค่ share ไม่ได้
+            Swal.fire({
+              icon: "info", title: "บันทึกสำเร็จแล้ว",
+              html: `<p>แต่ไม่สามารถเปิดแชร์ได้<br>
+                     <small style="color:#94a3b8">${err?.message || err}</small></p>`,
+              confirmButtonText: "ตกลง",
+              confirmButtonColor: "#22c55e",
+              background: "#1e293b", color: "#fff",
+            }).then(() => { resetForm(); showPage("page-form"); });
+          });
+      },
+      error: () => {
+        hideLoading(); isSubmitting = false;
         btn.disabled = false;
         btn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
-        Swal.fire({
-          icon: "warning",
-          title: "แชร์ไม่สำเร็จ",
-          html: `<p>ต้องการบันทึกข้อมูลโดยไม่แชร์ไหม?<br>
-                 <small style="color:#94a3b8">${err?.message || err}</small></p>`,
-          confirmButtonText: "บันทึกอย่างเดียว",
-          confirmButtonColor: "#3b82f6",
-          showCancelButton: true,
-          cancelButtonText: "ยกเลิก",
-          background: "#1e293b", color: "#fff",
-        }).then(r => { if (r.isConfirmed) doSaveToSheet(formData, btn, "✅ บันทึกสำเร็จ!"); });
-      });
+        Swal.fire({ icon:"error", title:"บันทึกไม่สำเร็จ",
+          text:"ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่",
+          background:"#1e293b", color:"#fff" });
+      }
+    });
   });
 
   // ============================================================
@@ -602,6 +634,14 @@
   // BUILD FLEX MESSAGE
   // ============================================================
   function buildFlexMessage(d, imgUrl) {
+    // ใช้รูปที่ผู้ใช้อัพโหลด ถ้ามี — ถ้าไม่มีใช้ default
+    // หมายเหตุ: LINE Flex ต้องการ URL สาธารณะ (https://)
+    // ถ้า imageBase64 มีค่า = รูปยังอยู่ใน base64 (ก่อนบันทึกไป Drive)
+    // ให้ใช้ imgUrl ที่ส่งมา (Apps Script จะคืน Drive URL กลับมาใน response)
+    // แต่ตอนสร้าง Flex ก่อนบันทึก → ใช้ driveImageUrl ที่ได้จาก response แทน
+    // ดังนั้น buildFlexMessage รับ finalImgUrl เป็น param โดยตรง
+    const headerImgUrl = imgUrl || DEFAULT_IMG;
+
     return {
       type:    "flex",
       altText: `📚 แจ้งสอนแทน | ${d.nameTeacher} → ${d.nameTeacherSave} | คาบ ${d.numberAtPeriod} | ห้อง ${d.subjectRoom}`,
@@ -611,7 +651,7 @@
         header: {
           type: "box", layout: "vertical", paddingAll: "0px",
           contents: [{
-            type: "image", url: imgUrl,
+            type: "image", url: headerImgUrl,
             size: "full", aspectRatio: "16:9", aspectMode: "cover"
           }]
         },
@@ -623,8 +663,8 @@
               type: "box", layout: "vertical",
               backgroundColor: "#00000077", paddingAll: "5px", cornerRadius: "xl",
               contents: [
-                { type:"text", text:"📚 แจ้งการสอนแทน",      color:"#ffffff", size:"xl", weight:"bold", align:"center" },
-                { type:"text", text:"ครูขาด • ลา • ไปราชการ", color:"#ffffffbb", size:"sm", align:"center", margin:"xs" }
+                { type:"text", text:"📚 แจ้งการสอนแทน",      color:"#ffffff", size:"xl", weight:"bold", align:"start" },
+                { type:"text", text:"ครูขาด • ลา • ไปราชการ", color:"#ffffffbb", size:"sm", align:"start", margin:"xs" }
               ]
             },
             makeRow("👩‍🏫 ผู้ลาสอน",    d.nameTeacher),
@@ -642,7 +682,7 @@
           backgroundColor: "#ec4899", paddingAll: "12px",
           contents: [{
             type:"text", text:"❤️ ระบบบันทึกการสอนแทน | ครูอั๋น ใจดี",
-            color:"#ffffff", size:"xs", align:"center", wrap:true
+            color:"#ffffff", size:"xs", align:"start", wrap:true
           }]
         }
       }
@@ -653,8 +693,8 @@
     return {
       type: "box", layout: "horizontal",
       contents: [
-        { type:"text", text:label, color:"#444444", size:"sm", weight:"bold", flex:5, wrap:true },
-        { type:"text", text:value, color:"#444444", size:"sm", weight:"bold", flex:6, align:"end", wrap:true }
+        { type:"text", text:label, color:"#444444", size:"sm", weight:"bold", flex:5, align:"start", wrap:true },
+        { type:"text", text:value, color:"#444444", size:"sm", weight:"bold", flex:6, align:"start", wrap:true }
       ]
     };
   }
