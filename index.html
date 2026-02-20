@@ -586,7 +586,13 @@
         // ==============================
         window._pendingFlex = null;
 
-       function submitData() {
+async function submitData() {
+    const submitBtn = document.getElementById("submitBtn");
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังดำเนินการ...`;
+
+    showLoading("กำลังบันทึกและเตรียมแชร์...");
+
     const data = {
         opt: "savedata",
         nameTeacher: document.getElementById("nameTeacher").value,
@@ -605,41 +611,43 @@
         data.uname = token?.name || "";
         data.uimg = token?.picture || "";
     } catch (e) {
-        console.warn("Cannot get user profile", e);
+        console.warn("Cannot get profile", e);
     }
 
-    const submitBtn = document.getElementById("submitBtn");
-    submitBtn.disabled = true;
-    submitBtn.innerHTML = `<span class="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></span>กำลังดำเนินการ...`;
+    try {
+        const response = await fetch(SCRIPT_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body: new URLSearchParams(data).toString(),
+        });
 
-    showLoading("กำลังบันทึกและเตรียมแชร์...");
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-    // ใช้ Promise เพื่อให้ flow ชัดเจน แต่ยังอยู่ใน user gesture chain
-    fetch(SCRIPT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams(data).toString(),
-    })
-    .then(response => response.json())
-    .then(res => {
+        const res = await response.json();
+
         hideLoading();
 
         if (res.status !== "success") {
             throw new Error(res.message || "บันทึกไม่สำเร็จ");
         }
 
-        const imgUrl = res.imageUrl && res.imageUrl.length > 10
+        const imgUrl = (res.imageUrl && res.imageUrl.length > 10)
             ? res.imageUrl
             : "https://lh3.googleusercontent.com/d/1hTcB5YnvnJtMg0l4fIO5Jo20QbKF5_wh";
 
         const flexMessage = buildFlexMessage(data, imgUrl);
 
-        // เช็คก่อนว่า API นี้ใช้ได้ใน environment ปัจจุบันหรือไม่
-        if (!liff.isInClient() || !liff.isApiAvailable("shareTargetPicker")) {
+        // เช็ค environment ก่อนแชร์
+        if (!liff.isInClient()) {
+            // External browser หรือไม่ใช่ LINE app
             Swal.fire({
                 icon: "warning",
-                title: "ไม่สามารถแชร์ได้ที่นี่",
-                html: "ฟีเจอร์แชร์ใช้ได้เฉพาะใน LINE แอปเท่านั้น<br>ข้อมูลบันทึกเรียบร้อยแล้ว",
+                title: "ไม่สามารถแชร์อัตโนมัติได้",
+                html: "ข้อมูลบันทึกเรียบร้อยแล้ว<br>กรุณาเปิดแอป LINE แล้วแชร์ด้วยตนเอง",
                 confirmButtonText: "ตกลง",
                 confirmButtonColor: "#22c55e",
                 background: "#1e293b",
@@ -653,50 +661,60 @@
             return;
         }
 
-        // แชร์ทันที (อยู่ใน .then() แต่ยังถือเป็นส่วนต่อเนื่องของ user click เพราะ fetch เป็น async แต่ promise chain ยังไม่ขาด)
-        // หากยัง error → ลองย้าย fetch ไปใช้ $.ajax + async: false (blocking) ชั่วคราว
-        showLoading("กำลังเปิดตัวเลือกแชร์...");
-        liff.shareTargetPicker([flexMessage], { isMultiple: true })
-            .then(() => {
-                hideLoading();
-                showToast("✅ บันทึกและแชร์สำเร็จแล้ว!");
+        if (!liff.isApiAvailable("shareTargetPicker")) {
+            Swal.fire({
+                icon: "warning",
+                title: "ฟีเจอร์แชร์ไม่รองรับ",
+                html: "LINE เวอร์ชันของคุณอาจเก่าเกินไป<br>ข้อมูลบันทึกเรียบร้อยแล้ว กรุณาอัปเดต LINE หรือแชร์เอง",
+                confirmButtonText: "ตกลง",
+                confirmButtonColor: "#22c55e",
+                background: "#1e293b",
+                color: "#fff",
+            }).then(() => {
                 resetForm();
                 showPage("page-form");
-            })
-            .catch(err => {
-                hideLoading();
-                console.error("shareTargetPicker failed:", err);
-                Swal.fire({
-                    icon: "error",
-                    title: "แชร์ไม่สำเร็จ",
-                    html: `แต่ข้อมูลถูกบันทึกเรียบร้อยแล้ว<br><small>${err.message || err || "ไม่ทราบสาเหตุ"}</small><br>คุณสามารถแชร์ข้อความด้วยตนเองได้`,
-                    confirmButtonText: "ตกลง",
-                    background: "#1e293b",
-                    color: "#fff",
-                }).then(() => {
-                    resetForm();
-                    showPage("page-form");
-                });
             });
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+            return;
+        }
 
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
-    })
-    .catch(err => {
+        // แชร์ทันทีหลังบันทึกสำเร็จ (อยู่ใน async function ที่เรียกจาก click event)
+        showLoading("กำลังเปิดตัวเลือกแชร์...");
+        await liff.shareTargetPicker([flexMessage], { isMultiple: true });
+
         hideLoading();
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+        showToast("✅ บันทึกและแชร์สำเร็จแล้ว!");
+        resetForm();
+        showPage("page-form");
+
+    } catch (err) {
+        hideLoading();
+        console.error("Error:", err);
+
+        let message = "เกิดข้อผิดพลาด กรุณาลองใหม่";
+        if (err.message.includes("shareTargetPicker")) {
+            message = `แชร์ไม่สำเร็จ แต่ข้อมูลบันทึกเรียบร้อยแล้ว<br><small>${err.message || err}</small>`;
+        } else {
+            message = err.message || "ไม่สามารถบันทึกได้";
+        }
+
         Swal.fire({
             icon: "error",
-            title: "เกิดข้อผิดพลาด",
-            text: err.message || "ไม่สามารถบันทึกได้ กรุณาลองใหม่",
+            title: err.message?.includes("share") ? "แชร์ไม่สำเร็จ" : "เกิดข้อผิดพลาด",
+            html: message,
+            confirmButtonText: "ตกลง",
             background: "#1e293b",
             color: "#fff",
+        }).then(() => {
+            resetForm();
+            showPage("page-form");
         });
-    });
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `<i class="bi bi-send-fill"></i> ยืนยันและส่ง`;
+    }
 }
-
-
 
         // ==============================
         // BUILD FLEX MESSAGE
